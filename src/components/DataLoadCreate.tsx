@@ -16,6 +16,7 @@ const DataLoadCreate: React.FC = () => {
   const [loadFrom, setLoadFrom] = useState<LoadFrom>('connector');
   const [structuredLoadType, setStructuredLoadType] = useState<StructuredLoadType>('database');
   const [unstructuredLoadType, setUnstructuredLoadType] = useState<UnstructuredLoadType>('file');
+  const [urlParseMethod, setUrlParseMethod] = useState<'page' | 'subpage'>('page'); // page: 解析网页内容, subpage: 解析子网页及网页内容
   const [targetMode, setTargetMode] = useState<TargetTableMode>('existing');
   const [dbSource, setDbSource] = useState<'hive' | 'mysql' | ''>('');
   const [sourceOpen, setSourceOpen] = useState(false);
@@ -43,19 +44,18 @@ const DataLoadCreate: React.FC = () => {
   // 表定义相关state
   const [conflictStrategy, setConflictStrategy] = useState('fail');
   const [dataProcessMode, setDataProcessMode] = useState<'append' | 'overwrite'>('append'); // 选择已有表时：数据处理方式，默认追加数据
-  const [loadMode, setLoadMode] = useState('once'); // once: 一次载入, incremental: 增量触发
-  const [syncUpstreamTruncate, setSyncUpstreamTruncate] = useState(false); // 增量触发时：同步上游truncate操作，默认关闭
-  const [syncStrategy, setSyncStrategy] = useState('single'); // single: 单事务, multi: 多事务
+  const [loadMode, setLoadMode] = useState('once'); // once: 一次载入, incremental: 实时同步
+  const [enablePartitionSync, setEnablePartitionSync] = useState(false); // 是否开启全量分区同步，默认关闭（false=单事务，true=多事务）
   const [partitionField, setPartitionField] = useState(''); // 按值分批：单字段
-  const [partitionFieldsForCount, setPartitionFieldsForCount] = useState<string[]>([]); // 按行数分批：支持复合唯一（多字段）
-  const [partitionFieldDropdownOpen, setPartitionFieldDropdownOpen] = useState(false); // 分批字段多选下拉是否展开
-  const [partitionFieldSearch, setPartitionFieldSearch] = useState(''); // 分批字段下拉内搜索关键词
+  const [partitionFieldsForCount, setPartitionFieldsForCount] = useState<string[]>([]); // 按行数分区：支持复合唯一（多字段）
+  const [partitionFieldDropdownOpen, setPartitionFieldDropdownOpen] = useState(false); // 分区字段多选下拉是否展开
+  const [partitionFieldSearch, setPartitionFieldSearch] = useState(''); // 分区字段下拉内搜索关键词
   const partitionFieldDropdownRef = useRef<HTMLDivElement>(null);
-  const [partitionFieldValueDropdownOpen, setPartitionFieldValueDropdownOpen] = useState(false); // 按字段值分批单选下拉是否展开
-  const [partitionFieldValueSearch, setPartitionFieldValueSearch] = useState(''); // 按字段值分批下拉内搜索关键词
+  const [partitionFieldValueDropdownOpen, setPartitionFieldValueDropdownOpen] = useState(false); // 按字段值分区单选下拉是否展开
+  const [partitionFieldValueSearch, setPartitionFieldValueSearch] = useState(''); // 按字段值分区下拉内搜索关键词
   const partitionFieldValueDropdownRef = useRef<HTMLDivElement>(null);
   const [partitionType, setPartitionType] = useState<'count' | 'value'>('count'); // count: 按行数, value: 按字段值
-  const [partitionSize, setPartitionSize] = useState('10000'); // 每批行数
+  const [partitionSize, setPartitionSize] = useState('10000'); // 每区行数
   const [newTableName, setNewTableName] = useState('');
   const [newTableDesc, setNewTableDesc] = useState('');
   const [columns, setColumns] = useState<Array<{
@@ -71,7 +71,7 @@ const DataLoadCreate: React.FC = () => {
     actionInfo: string;
   }>>([]);
 
-  // 点击外部关闭分批字段多选下拉
+  // 点击外部关闭分区字段多选下拉
   useEffect(() => {
     if (!partitionFieldDropdownOpen) return;
     const handleClick = (e: MouseEvent) => {
@@ -84,7 +84,7 @@ const DataLoadCreate: React.FC = () => {
     return () => document.removeEventListener('click', handleClick);
   }, [partitionFieldDropdownOpen]);
 
-  // 点击外部关闭按字段值分批单选下拉
+  // 点击外部关闭按字段值分区单选下拉
   useEffect(() => {
     if (!partitionFieldValueDropdownOpen) return;
     const handleClick = (e: MouseEvent) => {
@@ -285,7 +285,7 @@ const DataLoadCreate: React.FC = () => {
 
   const isDbLoad = dataType === 'structured' && structuredLoadType === 'database';
 
-  // 未选择表时关闭分批字段下拉
+  // 未选择表时关闭分区字段下拉
   useEffect(() => {
     if (isDbLoad && (!dbSource || !tableName)) {
       setPartitionFieldDropdownOpen(false);
@@ -507,21 +507,6 @@ const DataLoadCreate: React.FC = () => {
                 </div>
               )}
 
-              {unstructuredLoadType === 'webpage' && (
-                <div className="form-row">
-                  <div className="label">
-                    <span className="req">*</span>网页URL：
-                  </div>
-                  <div className="control">
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="请输入网页URL，如：https://example.com"
-                    />
-                  </div>
-                </div>
-              )}
-
               {unstructuredLoadType === 'file' && (
                 <div className="form-row">
                   <div className="label">
@@ -559,28 +544,57 @@ const DataLoadCreate: React.FC = () => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="label">载入模式：</div>
-                <div className="control">
-                  <div className="radio-row-horizontal">
-                    <label className="radio">
-                      <input
-                        type="radio"
-                        name="unstructuredMode"
-                        defaultChecked
-                      />
-                      <span>一次载入{unstructuredLoadType === 'file' ? '路径' : '网页'}</span>
-                    </label>
-                    <label className="radio">
-                      <input
-                        type="radio"
-                        name="unstructuredMode"
-                      />
-                      <span>周期载入{unstructuredLoadType === 'file' ? '路径' : '网页'}</span>
-                    </label>
+              {unstructuredLoadType === 'file' && (
+                <div className="form-row">
+                  <div className="label">载入模式：</div>
+                  <div className="control">
+                    <div className="radio-row-horizontal">
+                      <label className="radio">
+                        <input
+                          type="radio"
+                          name="unstructuredMode"
+                          defaultChecked
+                        />
+                        <span>一次载入路径</span>
+                      </label>
+                      <label className="radio">
+                        <input
+                          type="radio"
+                          name="unstructuredMode"
+                        />
+                        <span>周期载入路径</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {unstructuredLoadType === 'webpage' && (
+                <div className="form-row">
+                  <div className="label">
+                    <span className="req">*</span>载入模式：
+                  </div>
+                  <div className="control">
+                    <div className="radio-row-horizontal">
+                      <label className="radio">
+                        <input
+                          type="radio"
+                          name="webpageMode"
+                          defaultChecked
+                        />
+                        <span>一次载入</span>
+                      </label>
+                      <label className="radio">
+                        <input
+                          type="radio"
+                          name="webpageMode"
+                        />
+                        <span>周期载入</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {unstructuredLoadType === 'file' && (
                 <div className="form-row">
@@ -619,28 +633,101 @@ const DataLoadCreate: React.FC = () => {
               )}
 
               {unstructuredLoadType === 'webpage' && (
-                <div className="form-row">
-                  <div className="label">爬取深度：</div>
-                  <div className="control">
-                    <div className="radio-row-horizontal">
-                      <label className="radio">
-                        <input
-                          type="radio"
-                          name="crawlDepth"
-                          defaultChecked
-                        />
-                        <span>当前页面</span>
-                      </label>
-                      <label className="radio">
-                        <input
-                          type="radio"
-                          name="crawlDepth"
-                        />
-                        <span>包含子页面</span>
-                      </label>
+                <>
+                  <div className="form-row">
+                    <div className="label">
+                      <span className="req">*</span>URL解析方式：
+                    </div>
+                    <div className="control">
+                      <div className="url-parse-options">
+                        <label className="url-parse-option">
+                          <input 
+                            type="radio" 
+                            name="urlParseMethod" 
+                            value="page" 
+                            checked={urlParseMethod === 'page'}
+                            onChange={() => setUrlParseMethod('page')}
+                          />
+                          <div className="option-content">
+                            <span className="option-title">解析网页内容</span>
+                            <span className="option-desc">仅支持解析所上传URL的网页数据</span>
+                          </div>
+                        </label>
+                        <label className="url-parse-option">
+                          <input 
+                            type="radio" 
+                            name="urlParseMethod" 
+                            value="subpage" 
+                            checked={urlParseMethod === 'subpage'}
+                            onChange={() => setUrlParseMethod('subpage')}
+                          />
+                          <div className="option-content">
+                            <span className="option-title">解析子网页及网页内容</span>
+                            <span className="option-desc">上传URL将作为根目录，自动解析该页面内包含的网页内容</span>
+                          </div>
+                        </label>
+                      </div>
                     </div>
                   </div>
-                </div>
+
+                  <div className="form-row">
+                    <div className="label">输入URL：</div>
+                    <div className="control">
+                      <div className="url-input-group">
+                        <input
+                          type="text"
+                          className="input url-input"
+                          placeholder="请输入一个需要解析的url链接"
+                        />
+                        {urlParseMethod === 'page' && (
+                          <button type="button" className="add-url-btn">
+                            <span className="plus">+</span>
+                            添加链接
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="label">网页筛选：</div>
+                    <div className="control">
+                      <div className="switch-with-hint">
+                        <label className="switch-wrap">
+                          <input type="checkbox" className="switch-input" />
+                          <span className="switch-slider" />
+                        </label>
+                        <span className="switch-hint">指定网页抓取的主范围</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="label">抽取链接：</div>
+                    <div className="control">
+                      <div className="switch-with-hint">
+                        <label className="switch-wrap">
+                          <input type="checkbox" className="switch-input" />
+                          <span className="switch-slider" />
+                        </label>
+                        <span className="switch-hint">保留解析内容中文本与图片的超链接</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="label">文件下载：</div>
+                    <div className="control">
+                      <div className="switch-with-hint">
+                        <label className="switch-wrap">
+                          <input type="checkbox" className="switch-input" />
+                          <span className="switch-slider" />
+                        </label>
+                        <span className="switch-hint">自动识别并下载网页中包含的文件附件（如 PDF、Docx 等）并导入知识库</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
               {unstructuredLoadType === 'file' && (
@@ -763,29 +850,31 @@ const DataLoadCreate: React.FC = () => {
             </div>
           )}
 
-          {(dataType !== 'structured' || structuredLoadType === 'file') && (
-            <div className="form-row">
-              <div className="label">数据载入：</div>
-              <div className="control">
-                <div className="tabs">
-                  <button
-                    type="button"
-                    className={`tab ${loadFrom === 'connector' ? 'active' : ''}`}
-                    onClick={() => setLoadFrom('connector')}
-                  >
-                    连接器载入
-                  </button>
-                  <button
-                    type="button"
-                    className={`tab ${loadFrom === 'local' ? 'active' : ''}`}
-                    onClick={() => setLoadFrom('local')}
-                  >
-                    本地载入
-                  </button>
+          {dataType === 'structured' && (
+            <>
+            {structuredLoadType === 'file' && (
+              <div className="form-row">
+                <div className="label">数据载入：</div>
+                <div className="control">
+                  <div className="tabs">
+                    <button
+                      type="button"
+                      className={`tab ${loadFrom === 'connector' ? 'active' : ''}`}
+                      onClick={() => setLoadFrom('connector')}
+                    >
+                      连接器载入
+                    </button>
+                    <button
+                      type="button"
+                      className={`tab ${loadFrom === 'local' ? 'active' : ''}`}
+                      onClick={() => setLoadFrom('local')}
+                    >
+                      本地载入
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           <div className="form-row">
             <div className="label">
@@ -916,81 +1005,45 @@ const DataLoadCreate: React.FC = () => {
                     checked={loadMode === 'incremental'}
                     onChange={() => setLoadMode('incremental')}
                   />
-                  <span>增量触发</span>
+                  <span>实时同步</span>
                 </label>
               </div>
             </div>
           </div>
-
-          {loadMode === 'incremental' && (
-            <div className="form-row">
-              <div className="label">同步上游truncate操作：</div>
-              <div className="control">
-                <label className="switch-wrap">
-                  <input
-                    type="checkbox"
-                    className="switch-input"
-                    checked={syncUpstreamTruncate}
-                    onChange={(e) => setSyncUpstreamTruncate(e.target.checked)}
-                  />
-                  <span className="switch-slider" />
-                </label>
-              </div>
-            </div>
-          )}
 
           <div className="form-row">
-            <div className="label">同步策略：</div>
+            <div className="label">是否开启全量分区同步：</div>
             <div className="control">
-              <div className="radio-row-horizontal">
-                <label className="radio tooltip-trigger">
-                  <input
-                    type="radio"
-                    name="syncStrategy"
-                    checked={syncStrategy === 'single'}
-                    onChange={() => setSyncStrategy('single')}
-                  />
-                  <span>单事务</span>
-                  <div className="tooltip">
-                    数据作为一个整体写入。如果中间任何一行出错，全部自动撤回。保证数据"要么全有，要么全无"。<br />
-                    <strong>推荐：小数据量 / 高一致性</strong>
-                  </div>
-                </label>
-                <label className="radio tooltip-trigger">
-                  <input
-                    type="radio"
-                    name="syncStrategy"
-                    checked={syncStrategy === 'multi'}
-                    onChange={() => setSyncStrategy('multi')}
-                  />
-                  <span>多事务</span>
-                  <div className="tooltip">
-                    按选定字段的取值区间划分多个事务。若某个分批失败，仅回滚当前批。<br />
-                    <strong>适用于海量数据，防止锁表。</strong>
-                  </div>
-                </label>
-              </div>
+              <label className="switch-wrap">
+                <input
+                  type="checkbox"
+                  className="switch-input"
+                  checked={enablePartitionSync}
+                  onChange={(e) => setEnablePartitionSync(e.target.checked)}
+                />
+                <span className="switch-slider" />
+              </label>
             </div>
           </div>
 
-          {syncStrategy === 'multi' && (
+          {enablePartitionSync && (
             <div className={`form-row partition-config ${isDbLoad && (!dbSource || !tableName) ? 'partition-config-disabled' : ''}`}>
               <div className="label"></div>
               <div className="control">
                 <div className="partition-fields">
                   <div className="partition-field-group">
                     <label className="field-label field-label-with-help">
-                      分批方式
+                      分区方式
                       <span className="partition-help tooltip-trigger">
                         ?
                         <div className="tooltip partition-tooltip partition-tooltip--both">
                           <div className="tooltip-block">
-                            <div className="tooltip-title">按行数分批</div>
-                            需字段唯一，支持复合唯一（多字段）。排序后按每批行数切分事务。<br />
+                            <div className="tooltip-title">按行数分区</div>
+                            需字段唯一，支持复合唯一（多字段）。排序后按每区行数切分事务。<br />
                             示例：ORDER BY 字段 LIMIT 10000 / OFFSET 10000 等。
                           </div>
                           <div className="tooltip-block">
-                            <div className="tooltip-title">按字段值分批</div>
+                            <div className="tooltip-title">按字段值分区</div>
                             只能选一个字段。系统 SELECT DISTINCT 该字段，每个取值一个事务。<br />
                             示例：WHERE 字段 = 202509 / 202510 / 202511 等。
                           </div>
@@ -1011,13 +1064,13 @@ const DataLoadCreate: React.FC = () => {
                         setPartitionType(next);
                       }}
                     >
-                      <option value="count">按行数分批</option>
-                      <option value="value">按字段值分批</option>
+                      <option value="count">按行数分区</option>
+                      <option value="value">按字段值分区</option>
                     </select>
                   </div>
                   <div className="partition-field-group">
                     <label className="field-label">
-                      分批字段
+                      分区字段
                       {partitionType === 'count' && (
                         <span className="field-hint">（支持复合唯一，可多选）</span>
                       )}
@@ -1198,7 +1251,7 @@ const DataLoadCreate: React.FC = () => {
                 {partitionType === 'count' && (
                   <div className="partition-fields">
                     <div className="partition-field-group">
-                      <label className="field-label">每批行数</label>
+                      <label className="field-label">每区行数</label>
                       <input
                         type="text"
                         className="partition-input"
@@ -1603,6 +1656,8 @@ const DataLoadCreate: React.FC = () => {
                   </table>
                 </div>
               </div>
+            </>
+          )}
             </>
           )}
         </div>
