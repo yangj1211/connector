@@ -1,0 +1,143 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  min-width: 200px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-icon {
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-size: 13px;
+  line-height: 1.2;
+  color: #111827;
+}
+
+.logo-text strong {
+  font-weight: 600;
+  display: block;
+}
+
+.logo-subtitle {
+  font-size: 11px;
+  color: #2f6eea;
+  font-weight: 500;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: center;
+}
+
+.workspace-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #374151;
+  font-size: 12px;
+}
+
+.workspace-selector:hover {
+  background: #f3f4f6;
+}
+
+.workspace-selector svg {
+  color: #9ca3af;
+}
+
+.divider-dot {
+  color: #c7cad1;
+  font-size: 12px;
+}
+
+.workspace-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #374151;
+  font-size: 12px;
+}
+
+.workspace-switch:hover {
+  background: #f3f4f6;
+}
+
+.workspace-switch svg {
+  color: #9ca3af;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #7b8190;
+}
+
+.icon-btn:hover {
+  background: #f5f6f8;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  background: #2f6eea;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.collapse-btn {
+  margin-left: 4px;
+}

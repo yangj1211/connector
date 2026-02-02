@@ -1,0 +1,144 @@
+.sidebar {
+  width: 210px;
+  height: calc(100vh - 56px);
+  background: #f4f7ff;
+  border-right: 1px solid #eef0f3;
+  overflow-y: auto;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 8px 0;
+}
+
+.sidebar-main {
+  flex: 1;
+  padding: 4px 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #4b5563;
+  font-size: 13px;
+  position: relative;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.menu-item:hover {
+  background: #eef4ff;
+}
+
+.menu-item.expanded {
+  background: #eef4ff;
+}
+
+.menu-item.active-parent {
+  background: #e6f0ff;
+  color: #2f6eea;
+  font-weight: 500;
+}
+
+.menu-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b95a7;
+  flex-shrink: 0;
+}
+
+.menu-item.active-parent .menu-icon {
+  color: #2f6eea;
+}
+
+.menu-label {
+  flex: 1;
+  font-weight: 400;
+}
+
+.menu-arrow {
+  color: #9aa0a6;
+  margin-left: auto;
+  transition: transform 0.2s;
+}
+
+.menu-item.expanded .menu-arrow {
+  transform: rotate(90deg);
+}
+
+.submenu {
+  background: transparent;
+  padding: 2px 0;
+}
+
+.submenu-item {
+  padding: 8px 16px 8px 42px;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #4b5563;
+  font-size: 13px;
+  text-decoration: none;
+  display: block;
+}
+
+.submenu-item:hover {
+  background: #eef4ff;
+  color: #2f6eea;
+}
+
+.submenu-item.active {
+  background: #e6f0ff;
+  color: #2f6eea;
+  font-weight: 400;
+  position: relative;
+}
+
+.submenu-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #2f6eea;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: #e6ebf5;
+  margin: 8px 12px;
+}
+
+.sidebar-footer {
+  padding: 4px 0 8px;
+}
+
+.sidebar-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% - 24px);
+  margin: 4px 12px;
+  padding: 8px;
+  border: 1px solid #e6ebf5;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #8b95a7;
+}
+
+.sidebar-collapse:hover {
+  background: #eef4ff;
+}
