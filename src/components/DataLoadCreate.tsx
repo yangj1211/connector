@@ -71,32 +71,6 @@ const DataLoadCreate: React.FC = () => {
     actionInfo: string;
   }>>([]);
 
-  // 判断字段类型是否适合排序
-  const isFieldSortable = (dataType: string): boolean => {
-    const sortableTypes = ['BIGINT', 'INT', 'TINYINT', 'SMALLINT', 'DECIMAL', 'DOUBLE', 'FLOAT', 'DATE', 'DATETIME', 'TIMESTAMP'];
-    return sortableTypes.some(type => dataType.toUpperCase().includes(type));
-  };
-
-  // 按值分批：当前选中字段的数据类型
-  const selectedFieldType = useMemo(() => {
-    const name = partitionType === 'value' ? partitionField : partitionFieldsForCount[0];
-    if (!name) return null;
-    const field = columns.find(col => col.sourceFieldName === name);
-    return field?.sourceDataType || null;
-  }, [partitionType, partitionField, partitionFieldsForCount, columns]);
-
-  // 按行数分批：当前选中的字段是否都适合排序（复合唯一时看所有选中字段）
-  const isCurrentFieldSortable = useMemo(() => {
-    if (partitionType === 'value') {
-      return selectedFieldType ? isFieldSortable(selectedFieldType) : true;
-    }
-    if (partitionFieldsForCount.length === 0) return true;
-    return partitionFieldsForCount.every(name => {
-      const col = columns.find(c => c.sourceFieldName === name);
-      return col && isFieldSortable(col.sourceDataType);
-    });
-  }, [partitionType, selectedFieldType, partitionFieldsForCount, columns]);
-
   // 点击外部关闭分批字段多选下拉
   useEffect(() => {
     if (!partitionFieldDropdownOpen) return;
