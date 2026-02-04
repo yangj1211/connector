@@ -12,11 +12,47 @@ type UnstructuredLoadType = 'file' | 'webpage';
 
 const DataLoadCreate: React.FC = () => {
   const navigate = useNavigate();
+  const fileTypeDropdownRef = useRef<HTMLDivElement>(null);
+  
   const [dataType, setDataType] = useState<DataType>('structured');
   const [loadFrom, setLoadFrom] = useState<LoadFrom>('connector');
   const [structuredLoadType, setStructuredLoadType] = useState<StructuredLoadType>('database');
   const [unstructuredLoadType, setUnstructuredLoadType] = useState<UnstructuredLoadType>('file');
-  const [urlParseMethod, setUrlParseMethod] = useState<'page' | 'subpage'>('page'); // page: 解析网页内容, subpage: 解析子网页及网页内容
+  const [urlParseMethod, setUrlParseMethod] = useState<'page' | 'subpage' | 'targeted'>('page'); // page: 单页抓取, subpage: 递归抓取, targeted: 定向区域链接抓取
+  const [webpageUrls, setWebpageUrls] = useState<string[]>([]); // 网页载入 URL 列表，最多 20 个
+  const [webpageLoadMode, setWebpageLoadMode] = useState<'once' | 'periodic'>('once'); // 网页载入模式：一次载入/周期载入
+  const [addUrlModalOpen, setAddUrlModalOpen] = useState(false); // 添加链接弹窗状态
+  const [newUrlInput, setNewUrlInput] = useState(''); // 新URL输入框的值
+  const [urlInputError, setUrlInputError] = useState<string | null>(null); // URL格式错误信息
+  const [webpagePeriodDays, setWebpagePeriodDays] = useState<number>(1); // 周期载入天数：1, 3, 7, 30, 60, 90, 180
+  const [decompressionStrategy, setDecompressionStrategy] = useState<'ignore' | 'keep'>('ignore'); // 解压策略：忽略目录结构/保持原始目录结构
+  const [duplicateFileNameCheck, setDuplicateFileNameCheck] = useState(false); // 重复文件判断：文件名相同
+  const [duplicateMd5Check, setDuplicateMd5Check] = useState(false); // 重复文件判断：MD5
+  const [duplicateHandleMethod, setDuplicateHandleMethod] = useState<'skip' | 'overwrite'>('skip'); // 重复文件处理方式：跳过/覆盖
+  const [enableWebpageFilter, setEnableWebpageFilter] = useState(false); // 内容筛选开关
+  const [contentFilterSelector, setContentFilterSelector] = useState(''); // 主区域CSS选择器
+  const [contentFilterSelectorError, setContentFilterSelectorError] = useState<string | null>(null); // CSS 选择器语法校验错误
+  const [enableLinkAreaFilter, setEnableLinkAreaFilter] = useState(false); // 链接区域筛选开关（定向区域链接抓取时显示）
+  const [linkAreaSelector, setLinkAreaSelector] = useState(''); // 链接区域CSS选择器
+  const [linkAreaSelectorError, setLinkAreaSelectorError] = useState<string | null>(null); // 链接区域选择器语法校验错误
+  const [enableFileDownload, setEnableFileDownload] = useState(false); // 文件下载开关
+  const [onlyAttachmentContent, setOnlyAttachmentContent] = useState(true); // 仅保留附件内容
+  const [enableLinkExtraction, setEnableLinkExtraction] = useState(false); // 链接内容保留开关
+  
+  // 附件格式分类定义
+  const fileTypeCategories = {
+    文档: ['TXT', 'PDF', 'PPT', 'DOC', 'DOCX', 'Markdown'],
+    图片: ['JPG', 'PNG', 'GIF', 'BMP', 'SVG'],
+    音频: ['MP3', 'WAV', 'AAC', 'FLAC'],
+    视频: ['MP4', 'AVI', 'MKV', 'MOV'],
+    其他: ['ZIP', 'RAR', 'XLS', 'XLSX', 'CSV']
+  };
+  
+  // 获取所有文件格式
+  const allFileTypes = Object.values(fileTypeCategories).flat();
+  
+  const [selectedFileTypes, setSelectedFileTypes] = useState<string[]>(allFileTypes); // 默认全选
+  const [fileTypeDropdownOpen, setFileTypeDropdownOpen] = useState(false);
   const [targetMode, setTargetMode] = useState<TargetTableMode>('existing');
   const [dbSource, setDbSource] = useState<'hive' | 'mysql' | ''>('');
   const [sourceOpen, setSourceOpen] = useState(false);
@@ -71,6 +107,79 @@ const DataLoadCreate: React.FC = () => {
     actionInfo: string;
   }>>([]);
 
+  // CSS 选择器语法校验：使用浏览器原生 querySelector 检测
+  const validateContentFilterSelector = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setContentFilterSelectorError(null);
+      return;
+    }
+    try {
+      // 使用 querySelector 验证语法，如果语法错误会抛出异常
+      document.createElement('div').querySelector(trimmed);
+      // 额外检查：确保选择器不是空字符串且包含有效字符
+      if (trimmed.length === 0) {
+        setContentFilterSelectorError('CSS 选择器不能为空');
+        return;
+      }
+      setContentFilterSelectorError(null);
+    } catch (err) {
+      // 捕获 DOMException 或其他语法错误
+      setContentFilterSelectorError('CSS 选择器语法无效，请检查后重新输入');
+    }
+  };
+
+  // 链接区域CSS选择器语法校验
+  const validateLinkAreaSelector = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setLinkAreaSelectorError(null);
+      return;
+    }
+    try {
+      // 使用 querySelector 验证语法，如果语法错误会抛出异常
+      document.createElement('div').querySelector(trimmed);
+      // 额外检查：确保选择器不是空字符串且包含有效字符
+      if (trimmed.length === 0) {
+        setLinkAreaSelectorError('CSS 选择器不能为空');
+        return;
+      }
+      setLinkAreaSelectorError(null);
+    } catch (err) {
+      // 捕获 DOMException 或其他语法错误
+      setLinkAreaSelectorError('CSS 选择器语法无效，请检查后重新输入');
+    }
+  };
+
+  // URL格式校验
+  const validateUrl = (url: string): boolean => {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      setUrlInputError('请输入URL链接');
+      return false;
+    }
+    
+    // 使用浏览器原生URL构造函数进行验证
+    try {
+      const urlObj = new URL(trimmed);
+      // 检查协议是否为 http 或 https
+      if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+        setUrlInputError('URL格式不正确，必须以 http:// 或 https:// 开头');
+        return false;
+      }
+      // 检查hostname是否有效
+      if (!urlObj.hostname || urlObj.hostname.length === 0) {
+        setUrlInputError('URL格式不正确，请检查域名部分');
+        return false;
+      }
+      setUrlInputError(null);
+      return true;
+    } catch (err) {
+      setUrlInputError('URL格式不正确，请输入以 http:// 或 https:// 开头的有效URL');
+      return false;
+    }
+  };
+
   // 点击外部关闭分区字段多选下拉
   useEffect(() => {
     if (!partitionFieldDropdownOpen) return;
@@ -96,6 +205,25 @@ const DataLoadCreate: React.FC = () => {
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [partitionFieldValueDropdownOpen]);
+
+  // 点击外部关闭文件类型下拉
+  useEffect(() => {
+    if (!fileTypeDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (fileTypeDropdownRef.current && !fileTypeDropdownRef.current.contains(e.target as Node)) {
+        setFileTypeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [fileTypeDropdownOpen]);
+
+  // 当"文件下载"开启且勾选"仅保留附件内容"时，自动关闭"链接内容保留"
+  useEffect(() => {
+    if (enableFileDownload && onlyAttachmentContent) {
+      setEnableLinkExtraction(false);
+    }
+  }, [enableFileDownload, onlyAttachmentContent]);
 
   // 获取目标表结构（模拟从API获取）
   const getTargetTableFields = useMemo(() => {
@@ -446,7 +574,7 @@ const DataLoadCreate: React.FC = () => {
           <div className="ltc-main">
             <div className="ltc-title">结构化数据</div>
             <div className="ltc-desc">
-              支持结构化数据上传，包括csv、xlsx、xls，并将结构化数据导入表中
+              支持结构化文件和数据库表导入表中
             </div>
           </div>
         </button>
@@ -570,30 +698,113 @@ const DataLoadCreate: React.FC = () => {
               )}
 
               {unstructuredLoadType === 'webpage' && (
-                <div className="form-row">
-                  <div className="label">
-                    <span className="req">*</span>载入模式：
-                  </div>
-                  <div className="control">
-                    <div className="radio-row-horizontal">
-                      <label className="radio">
-                        <input
-                          type="radio"
-                          name="webpageMode"
-                          defaultChecked
-                        />
-                        <span>一次载入</span>
-                      </label>
-                      <label className="radio">
-                        <input
-                          type="radio"
-                          name="webpageMode"
-                        />
-                        <span>周期载入</span>
-                      </label>
+                <>
+                  <div className="form-row">
+                    <div className="label">
+                      <span className="req">*</span>载入模式：
+                    </div>
+                    <div className="control">
+                      <div className="radio-row-horizontal">
+                        <label className="radio">
+                          <input
+                            type="radio"
+                            name="webpageMode"
+                            checked={webpageLoadMode === 'once'}
+                            onChange={() => setWebpageLoadMode('once')}
+                          />
+                          <span>一次载入</span>
+                        </label>
+                        <label className="radio">
+                          <input
+                            type="radio"
+                            name="webpageMode"
+                            checked={webpageLoadMode === 'periodic'}
+                            onChange={() => setWebpageLoadMode('periodic')}
+                          />
+                          <span>周期载入</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
-                </div>
+                  {webpageLoadMode === 'periodic' && (
+                    <div className="form-row">
+                      <div className="label">周期：</div>
+                      <div className="control">
+                        <select
+                          className="select"
+                          value={webpagePeriodDays}
+                          onChange={(e) => setWebpagePeriodDays(Number(e.target.value))}
+                          style={{ width: 120 }}
+                        >
+                          <option value={1}>1天</option>
+                          <option value={3}>3天</option>
+                          <option value={7}>7天</option>
+                          <option value={30}>30天</option>
+                          <option value={60}>60天</option>
+                          <option value={90}>90天</option>
+                          <option value={180}>180天</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="form-row">
+                    <div className="label">
+                      重复文件处理：
+                      <span className="label-help" title="重复文件处理说明">?</span>
+                    </div>
+                    <div className="control">
+                      <div className="duplicate-config-vertical">
+                        <div>
+                          <label className="config-label">判断规则：</label>
+                          <div className="checkbox-group-horizontal">
+                            <label className="checkbox-item">
+                              <input
+                                type="checkbox"
+                                checked={duplicateFileNameCheck}
+                                onChange={(e) => setDuplicateFileNameCheck(e.target.checked)}
+                              />
+                              <span>文件名相同</span>
+                            </label>
+                            <label className="checkbox-item">
+                              <input
+                                type="checkbox"
+                                checked={duplicateMd5Check}
+                                onChange={(e) => setDuplicateMd5Check(e.target.checked)}
+                              />
+                              <span>MD5</span>
+                            </label>
+                          </div>
+                        </div>
+                        <div className="handle-method-section">
+                          <label className="config-label">处理方式：</label>
+                          <div className="radio-group-horizontal">
+                            <label className={`radio ${!duplicateFileNameCheck && !duplicateMd5Check ? 'disabled' : ''}`}>
+                              <input
+                                type="radio"
+                                name="duplicateHandleMethod"
+                                checked={duplicateHandleMethod === 'skip'}
+                                onChange={() => setDuplicateHandleMethod('skip')}
+                                disabled={!duplicateFileNameCheck && !duplicateMd5Check}
+                              />
+                              <span>跳过</span>
+                            </label>
+                            <label className={`radio ${!duplicateFileNameCheck && !duplicateMd5Check ? 'disabled' : ''}`}>
+                              <input
+                                type="radio"
+                                name="duplicateHandleMethod"
+                                checked={duplicateHandleMethod === 'overwrite'}
+                                onChange={() => setDuplicateHandleMethod('overwrite')}
+                                disabled={!duplicateFileNameCheck && !duplicateMd5Check}
+                              />
+                              <span>覆盖</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
               {unstructuredLoadType === 'file' && (
@@ -636,7 +847,7 @@ const DataLoadCreate: React.FC = () => {
                 <>
                   <div className="form-row">
                     <div className="label">
-                      <span className="req">*</span>URL解析方式：
+                      <span className="req">*</span>网页抓取方式：
                     </div>
                     <div className="control">
                       <div className="url-parse-options">
@@ -649,8 +860,8 @@ const DataLoadCreate: React.FC = () => {
                             onChange={() => setUrlParseMethod('page')}
                           />
                           <div className="option-content">
-                            <span className="option-title">解析网页内容</span>
-                            <span className="option-desc">仅支持解析所上传URL的网页数据</span>
+                            <span className="option-title">单页抓取</span>
+                            <span className="option-desc">仅抓取当前特定 URL 页面内容</span>
                           </div>
                         </label>
                         <label className="url-parse-option">
@@ -662,39 +873,87 @@ const DataLoadCreate: React.FC = () => {
                             onChange={() => setUrlParseMethod('subpage')}
                           />
                           <div className="option-content">
-                            <span className="option-title">解析子网页及网页内容</span>
-                            <span className="option-desc">上传URL将作为根目录，自动解析该页面内包含的网页内容</span>
+                            <span className="option-title">递归抓取</span>
+                            <span className="option-desc">以该 URL 为起点，自动抓取其包含的子页面</span>
+                          </div>
+                        </label>
+                        <label className="url-parse-option">
+                          <input 
+                            type="radio" 
+                            name="urlParseMethod" 
+                            value="targeted" 
+                            checked={urlParseMethod === 'targeted'}
+                            onChange={() => setUrlParseMethod('targeted')}
+                          />
+                          <div className="option-content">
+                            <span className="option-title">定向区域链接抓取</span>
+                            <span className="option-desc">系统将访问入口网页，获取该区域内的链接，并深入抓取这些链接指向的具体网页内容。</span>
                           </div>
                         </label>
                       </div>
                     </div>
                   </div>
 
-                  <div className="form-row">
-                    <div className="label">输入URL：</div>
-                    <div className="control">
-                      <div className="url-input-group">
-                        <input
-                          type="text"
-                          className="input url-input"
-                          placeholder="请输入一个需要解析的url链接"
-                        />
-                        {urlParseMethod === 'page' && (
-                          <button type="button" className="add-url-btn">
-                            <span className="plus">+</span>
-                            添加链接
-                          </button>
-                        )}
+                  {urlParseMethod === 'targeted' && (
+                    <>
+                      <div className="form-row">
+                        <div className="label">链接区域筛选：</div>
+                        <div className="control">
+                          <div className="switch-with-hint">
+                            <label className="switch-wrap">
+                              <input
+                                type="checkbox"
+                                className="switch-input"
+                                checked={enableLinkAreaFilter}
+                                onChange={(e) => setEnableLinkAreaFilter(e.target.checked)}
+                              />
+                              <span className="switch-slider" />
+                            </label>
+                            <span className="switch-hint">入口网址中选择链接的区域</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                      {enableLinkAreaFilter && (
+                        <div className="content-filter-block">
+                          <div className="form-row">
+                            <div className="label" />
+                            <div className="control">
+                              <input
+                                type="text"
+                                className={`input content-selector-input ${linkAreaSelectorError ? 'input-error' : ''}`}
+                                placeholder="请输入链接区域CSS选择器(例如: .link-area)"
+                                value={linkAreaSelector}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setLinkAreaSelector(v);
+                                  validateLinkAreaSelector(v);
+                                }}
+                                onBlur={() => validateLinkAreaSelector(linkAreaSelector)}
+                              />
+                              {linkAreaSelectorError && (
+                                <p className="content-filter-error">{linkAreaSelectorError}</p>
+                              )}
+                              <p className="content-filter-desc">
+                                表示入口网址中选择链接的区域，仅在此区域内抽取链接进行定向抓取
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
 
                   <div className="form-row">
-                    <div className="label">网页筛选：</div>
+                    <div className="label">内容筛选：</div>
                     <div className="control">
                       <div className="switch-with-hint">
                         <label className="switch-wrap">
-                          <input type="checkbox" className="switch-input" />
+                          <input
+                            type="checkbox"
+                            className="switch-input"
+                            checked={enableWebpageFilter}
+                            onChange={(e) => setEnableWebpageFilter(e.target.checked)}
+                          />
                           <span className="switch-slider" />
                         </label>
                         <span className="switch-hint">指定网页抓取的主范围</span>
@@ -702,15 +961,49 @@ const DataLoadCreate: React.FC = () => {
                     </div>
                   </div>
 
+                  {enableWebpageFilter && (
+                    <div className="content-filter-block">
+                      <div className="form-row">
+                        <div className="label" />
+                        <div className="control">
+                          <input
+                            type="text"
+                            className={`input content-selector-input ${contentFilterSelectorError ? 'input-error' : ''}`}
+                            placeholder="请输入主区域CSS选择器(例如: #main-content)"
+                            value={contentFilterSelector}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setContentFilterSelector(v);
+                              validateContentFilterSelector(v);
+                            }}
+                            onBlur={() => validateContentFilterSelector(contentFilterSelector)}
+                          />
+                          {contentFilterSelectorError && (
+                            <p className="content-filter-error">{contentFilterSelectorError}</p>
+                          )}
+                          <p className="content-filter-desc">
+                            可批量指定相同结构的网页内容范围进行解析。例如,可筛选新闻、产品文档、商品详情页中特定位置的内容,忽略顶部导航、广告、推荐等无关信息
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="form-row">
-                    <div className="label">抽取链接：</div>
+                    <div className="label">链接内容保留：</div>
                     <div className="control">
                       <div className="switch-with-hint">
-                        <label className="switch-wrap">
-                          <input type="checkbox" className="switch-input" />
+                        <label className={`switch-wrap ${(enableFileDownload && onlyAttachmentContent) ? 'disabled' : ''}`}>
+                          <input 
+                            type="checkbox" 
+                            className="switch-input"
+                            checked={enableLinkExtraction}
+                            onChange={(e) => setEnableLinkExtraction(e.target.checked)}
+                            disabled={enableFileDownload && onlyAttachmentContent}
+                          />
                           <span className="switch-slider" />
                         </label>
-                        <span className="switch-hint">保留解析内容中文本与图片的超链接</span>
+                        <span className={`switch-hint ${(enableFileDownload && onlyAttachmentContent) ? 'disabled' : ''}`}>保留网页中的超链接</span>
                       </div>
                     </div>
                   </div>
@@ -718,15 +1011,154 @@ const DataLoadCreate: React.FC = () => {
                   <div className="form-row">
                     <div className="label">文件下载：</div>
                     <div className="control">
-                      <div className="switch-with-hint">
+                      <div className="file-download-row">
                         <label className="switch-wrap">
-                          <input type="checkbox" className="switch-input" />
+                          <input
+                            type="checkbox"
+                            className="switch-input"
+                            checked={enableFileDownload}
+                            onChange={(e) => setEnableFileDownload(e.target.checked)}
+                          />
                           <span className="switch-slider" />
                         </label>
-                        <span className="switch-hint">自动识别并下载网页中包含的文件附件（如 PDF、Docx 等）并导入知识库</span>
+                        {enableFileDownload && (
+                          <label className="checkbox-item only-attachment-check">
+                            <input
+                              type="checkbox"
+                              checked={onlyAttachmentContent}
+                              onChange={(e) => setOnlyAttachmentContent(e.target.checked)}
+                            />
+                            <span>仅保留附件内容</span>
+                          </label>
+                        )}
                       </div>
+                      {enableFileDownload && (
+                        <div className="attachment-format-block">
+                          <div className="attachment-format-header">
+                            <span className="attachment-format-icon" aria-hidden>📄</span>
+                            <span className="attachment-format-label">附件格式过滤</span>
+                          </div>
+                          <div className="file-type-selector-wrapper" ref={fileTypeDropdownRef}>
+                            <div 
+                              className="file-type-selector"
+                              onClick={() => setFileTypeDropdownOpen(!fileTypeDropdownOpen)}
+                            >
+                              <span className="file-type-display">
+                                {selectedFileTypes.length === 0 
+                                  ? '请选择文件类型' 
+                                  : selectedFileTypes.length === allFileTypes.length
+                                  ? `全部文件类型（${selectedFileTypes.length}项）`
+                                  : `已选择 ${selectedFileTypes.length} 种文件类型`}
+                              </span>
+                              <span className="dropdown-arrow">{fileTypeDropdownOpen ? '▲' : '▼'}</span>
+                            </div>
+                            {fileTypeDropdownOpen && (
+                              <div className="file-type-dropdown">
+                                <div className="file-type-category-header">
+                                  <label className="file-type-category-item">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedFileTypes.length === allFileTypes.length}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedFileTypes(allFileTypes);
+                                        } else {
+                                          setSelectedFileTypes([]);
+                                        }
+                                      }}
+                                    />
+                                    <span>全选</span>
+                                  </label>
+                                </div>
+                                {Object.entries(fileTypeCategories).map(([category, types]) => (
+                                  <div key={category} className="file-type-category">
+                                    <label className="file-type-category-item">
+                                      <input
+                                        type="checkbox"
+                                        checked={types.every(t => selectedFileTypes.includes(t))}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedFileTypes(prev => {
+                                              const newSet = new Set([...prev, ...types]);
+                                              return Array.from(newSet);
+                                            });
+                                          } else {
+                                            setSelectedFileTypes(prev => 
+                                              prev.filter(t => !types.includes(t))
+                                            );
+                                          }
+                                        }}
+                                      />
+                                      <span className="category-name">{category}</span>
+                                      <span className="expand-arrow">›</span>
+                                    </label>
+                                    <div className="file-type-list">
+                                      {types.map(type => (
+                                        <label key={type} className="file-type-item">
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedFileTypes.includes(type)}
+                                            onChange={(e) => {
+                                              if (e.target.checked) {
+                                                setSelectedFileTypes(prev => [...prev, type]);
+                                              } else {
+                                                setSelectedFileTypes(prev => 
+                                                  prev.filter(t => t !== type)
+                                                );
+                                              }
+                                            }}
+                                          />
+                                          <span>{type}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <p className="file-download-desc">
+                            自动识别并下载网页中包含的文件附件(如PDF、Docx、Xlsx等)
+                          </p>
+                        </div>
+                      )}
+                      {!enableFileDownload && (
+                        <span className="switch-hint">自动识别并下载网页中包含的文件附件（如 PDF、Docx 等）</span>
+                      )}
                     </div>
                   </div>
+
+                  {enableFileDownload && (
+                    <div className="form-row">
+                      <div className="label">
+                        解压策略：
+                        <span className="label-help" title="解压策略说明">?</span>
+                      </div>
+                      <div className="control">
+                        <div className="radio-row-horizontal">
+                          <label className="radio">
+                            <input
+                              type="radio"
+                              name="decompressionStrategy"
+                              checked={decompressionStrategy === 'ignore'}
+                              onChange={() => setDecompressionStrategy('ignore')}
+                            />
+                            <span>忽略目录结构</span>
+                          </label>
+                          <label className="radio disabled">
+                            <input
+                              type="radio"
+                              name="decompressionStrategy"
+                              checked={decompressionStrategy === 'keep'}
+                              onChange={() => setDecompressionStrategy('keep')}
+                              disabled
+                            />
+                            <span>保持原始目录结构</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -793,33 +1225,59 @@ const DataLoadCreate: React.FC = () => {
               ) : (
                 <div className="upload-files-section">
                   <div className="upload-files-header">
-                    <span className="upload-files-title">载入网页</span>
-                    <span className="upload-files-count">全部网页</span>
+                    <span className="upload-files-title">{urlParseMethod === 'targeted' ? '入口网页' : '载入网页'}</span>
+                    <button
+                      type="button"
+                      className="add-url-modal-btn"
+                      onClick={() => {
+                        setNewUrlInput('');
+                        setUrlInputError(null);
+                        setAddUrlModalOpen(true);
+                      }}
+                      disabled={(urlParseMethod === 'subpage' || urlParseMethod === 'targeted') && webpageUrls.length >= 1}
+                    >
+                      添加链接
+                    </button>
                   </div>
                   <div className="upload-files-table">
                     <table className="files-table">
                       <thead>
                         <tr>
-                          <th style={{ width: '40px' }}>
-                            <input type="checkbox" />
-                          </th>
-                          <th>网页标题</th>
-                          <th>网页URL</th>
-                          <th>状态</th>
+                          <th>URL</th>
+                          <th style={{ width: '100px' }}>操作</th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr>
-                          <td colSpan={4} className="empty-files">
-                            <div className="empty-files-content">
-                              <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-                                <circle cx="30" cy="30" r="18" stroke="#d1d5db" strokeWidth="2" />
-                                <path d="M20 24h20M20 30h20M20 36h12" stroke="#e5e7eb" strokeWidth="2" strokeLinecap="round" />
-                              </svg>
-                              <div className="empty-files-text">暂无数据</div>
-                            </div>
-                          </td>
-                        </tr>
+                        {webpageUrls.length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="empty-files">
+                              <div className="empty-files-content">
+                                <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+                                  <circle cx="30" cy="30" r="18" stroke="#d1d5db" strokeWidth="2" />
+                                  <path d="M20 24h20M20 30h20M20 36h12" stroke="#e5e7eb" strokeWidth="2" strokeLinecap="round" />
+                                </svg>
+                                <div className="empty-files-text">暂无数据</div>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          webpageUrls.map((url, i) => (
+                            <tr key={i}>
+                              <td>{url}</td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="url-list-delete-btn"
+                                  onClick={() => {
+                                    setWebpageUrls((prev) => prev.filter((_, idx) => idx !== i));
+                                  }}
+                                >
+                                  删除
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1748,6 +2206,105 @@ const DataLoadCreate: React.FC = () => {
           setUnstructuredModalOpen(false);
         }}
       />
+
+      {/* 添加链接弹窗 */}
+      {addUrlModalOpen && (
+        <div className="modal-overlay" onClick={() => {
+          setNewUrlInput('');
+          setUrlInputError(null);
+          setAddUrlModalOpen(false);
+        }}>
+          <div className="modal-content add-url-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">添加链接</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => {
+                  setNewUrlInput('');
+                  setUrlInputError(null);
+                  setAddUrlModalOpen(false);
+                }}
+                aria-label="关闭"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-row">
+                <div className="label">URL：</div>
+                <div className="control">
+                  <input
+                    type="text"
+                    className={`input ${urlInputError ? 'input-error' : ''}`}
+                    placeholder="请输入URL链接"
+                    value={newUrlInput}
+                    onChange={(e) => {
+                      setNewUrlInput(e.target.value);
+                      if (urlInputError) {
+                        validateUrl(e.target.value);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (newUrlInput.trim()) {
+                        validateUrl(newUrlInput);
+                      } else {
+                        setUrlInputError(null);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const trimmed = newUrlInput.trim();
+                        const maxUrls = (urlParseMethod === 'subpage' || urlParseMethod === 'targeted') ? 1 : 20;
+                        if (validateUrl(trimmed) && webpageUrls.length < maxUrls) {
+                          setWebpageUrls((prev) => [...prev, trimmed]);
+                          setNewUrlInput('');
+                          setUrlInputError(null);
+                          setAddUrlModalOpen(false);
+                        }
+                      }
+                    }}
+                  />
+                  {urlInputError && (
+                    <div className="url-input-error">{urlInputError}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="modal-btn modal-btn-cancel"
+                onClick={() => {
+                  setNewUrlInput('');
+                  setUrlInputError(null);
+                  setAddUrlModalOpen(false);
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="modal-btn modal-btn-confirm"
+                onClick={() => {
+                  const trimmed = newUrlInput.trim();
+                  const maxUrls = (urlParseMethod === 'subpage' || urlParseMethod === 'targeted') ? 1 : 20;
+                  if (validateUrl(trimmed) && webpageUrls.length < maxUrls) {
+                    setWebpageUrls((prev) => [...prev, trimmed]);
+                    setNewUrlInput('');
+                    setUrlInputError(null);
+                    setAddUrlModalOpen(false);
+                  }
+                }}
+                disabled={!newUrlInput.trim() || ((urlParseMethod === 'subpage' || urlParseMethod === 'targeted') ? webpageUrls.length >= 1 : webpageUrls.length >= 20) || !!urlInputError}
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
