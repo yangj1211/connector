@@ -122,6 +122,32 @@ const DataLoadList: React.FC = () => {
         createdTime: '2026-01-29 14:36:15',
         createdBy: 'admin',
       },
+      {
+        id: '2016765054542139393',
+        loadType: '网页数据',
+        connectorType: '网页载入',
+        connectorName: '网页载入连接器',
+        loadMode: '一次载入',
+        target: '金盈问数/网页数据/新闻资讯',
+        status: '运行中',
+        progress: { inserted: 3250, total: 5000 },
+        completedTime: '-',
+        createdTime: '2026-01-29 15:10:20',
+        createdBy: 'admin',
+      },
+      {
+        id: '2016765054542139394',
+        loadType: '网页数据',
+        connectorType: '网页载入',
+        connectorName: '网页载入连接器',
+        loadMode: '周期载入',
+        target: '金盈问数/网页数据/产品文档',
+        status: '完成',
+        progress: { inserted: 8500, total: 8500 },
+        completedTime: '2026-01-29 15:05:10',
+        createdTime: '2026-01-29 14:30:00',
+        createdBy: 'admin',
+      },
     ]);
 
   useEffect(() => {
@@ -280,15 +306,28 @@ const DataLoadList: React.FC = () => {
                   <td>{r.loadType}</td>
                   <td>
                     <span className="inline-icon">
-                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                        <rect x="2" y="3" width="14" height="12" rx="2" fill="#2f6eea" />
-                        <path
-                          d="M5 7h8M5 10h8"
-                          stroke="white"
-                          strokeWidth="1.4"
-                          strokeLinecap="round"
-                        />
-                      </svg>
+                      {r.connectorType === '网页载入' ? (
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <rect x="2" y="3" width="14" height="12" rx="2" fill="#10b981" />
+                          <path
+                            d="M6 7l2 2 4-4M8 11h4"
+                            stroke="white"
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <rect x="2" y="3" width="14" height="12" rx="2" fill="#2f6eea" />
+                          <path
+                            d="M5 7h8M5 10h8"
+                            stroke="white"
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      )}
                       {r.connectorType}
                     </span>
                   </td>
@@ -360,22 +399,24 @@ const DataLoadList: React.FC = () => {
                           </svg>
                         </button>
                       )}
-                      <button 
-                        className="icon-action" 
-                        title="重启同步"
-                        onClick={() => handleRestart(r.id)}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <path
-                            d="M13 8A5 5 0 1 1 8 3V1l3 2-3 2V3a5 5 0 1 0 5 5"
-                            stroke="currentColor"
-                            strokeWidth="1.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            fill="none"
-                          />
-                        </svg>
-                      </button>
+                      {r.loadType !== '网页数据' && (
+                        <button 
+                          className="icon-action" 
+                          title="重启同步"
+                          onClick={() => handleRestart(r.id)}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path
+                              d="M13 8A5 5 0 1 1 8 3V1l3 2-3 2V3a5 5 0 1 0 5 5"
+                              stroke="currentColor"
+                              strokeWidth="1.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill="none"
+                            />
+                          </svg>
+                        </button>
+                      )}
                       <button 
                         className="icon-action icon-action-danger" 
                         title="删除"
