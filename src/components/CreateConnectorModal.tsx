@@ -22,7 +22,6 @@ const CreateConnectorModal: React.FC<CreateConnectorModalProps> = ({
     username: '',
     password: '',
     databaseName: '',
-    jdbcUrl: '',
     hiveAuthMode: 'ldap',
     kerberosPrincipal: '',
     keytabFile: null as File | null,
@@ -77,9 +76,6 @@ const CreateConnectorModal: React.FC<CreateConnectorModalProps> = ({
     if (formData.dbEngine === 'hive') return '请输入端口号（默认：10000）';
     return '请输入端口号（默认：6001）';
   })();
-
-  const hiveJdbcPlaceholder =
-    '请输入 JDBC URL（如：jdbc:hive2://192.168.1.100:10000/default）';
 
   if (!isOpen) return null;
 
@@ -190,21 +186,38 @@ const CreateConnectorModal: React.FC<CreateConnectorModalProps> = ({
               <div className="form-label">连接信息:</div>
               <div className="form-control">
                 <div className="connection-panel">
-                  {isHive ? (
-                    <>
-                      <div className="panel-row">
-                        <div className="panel-label">
-                          <span className="required">*</span>JDBC URL
-                          <span className="help">?</span>
-                        </div>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder={hiveJdbcPlaceholder}
-                          value={formData.jdbcUrl}
-                          onChange={(e) => handleInputChange('jdbcUrl', e.target.value)}
-                        />
+                  <>
+                    <div className="panel-row">
+                      <div className="panel-label">
+                        <span className="required">*</span>主机
+                        <span className="help">?</span>
                       </div>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder={hostPlaceholder}
+                        value={formData.host}
+                        onChange={(e) => handleInputChange('host', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="panel-row">
+                      <div className="panel-label">
+                        <span className="required">*</span>端口
+                        <span className="help">?</span>
+                      </div>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder={portPlaceholder}
+                        value={formData.port}
+                        onChange={(e) => handleInputChange('port', e.target.value)}
+                      />
+                    </div>
+                  </>
+
+                  {isHive && (
+                    <>
                       <div className="panel-row">
                         <div className="panel-label">
                           认证方式
@@ -292,36 +305,6 @@ const CreateConnectorModal: React.FC<CreateConnectorModalProps> = ({
                           </div>
                         </>
                       )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="panel-row">
-                        <div className="panel-label">
-                          <span className="required">*</span>主机
-                          <span className="help">?</span>
-                        </div>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder={hostPlaceholder}
-                          value={formData.host}
-                          onChange={(e) => handleInputChange('host', e.target.value)}
-                        />
-                      </div>
-
-                      <div className="panel-row">
-                        <div className="panel-label">
-                          <span className="required">*</span>端口
-                          <span className="help">?</span>
-                        </div>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder={portPlaceholder}
-                          value={formData.port}
-                          onChange={(e) => handleInputChange('port', e.target.value)}
-                        />
-                      </div>
                     </>
                   )}
 
