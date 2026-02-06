@@ -23,11 +23,14 @@ const CreateConnectorModal: React.FC<CreateConnectorModalProps> = ({
     password: '',
     databaseName: '',
     hiveAuthMode: 'ldap',
+    hiveHostPorts: [{ host: '', port: '' }] as { host: string; port: string }[],
     kerberosPrincipal: '',
     keytabFile: null as File | null,
     krb5File: null as File | null,
   });
   const [showPassword, setShowPassword] = useState(false);
+
+  const maxHiveHostPorts = 3;
 
   const connectorTypes = [
     { id: 'object-storage', label: '对象存储' },
@@ -43,7 +46,36 @@ const CreateConnectorModal: React.FC<CreateConnectorModalProps> = ({
   ] as const;
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === 'dbEngine' && value === 'hive' && (prev.host || prev.port)) {
+        next.hiveHostPorts = [{ host: prev.host, port: prev.port }];
+      }
+      return next;
+    });
+  };
+
+  const updateHiveHostPort = (index: number, field: 'host' | 'port', value: string) => {
+    setFormData((prev) => {
+      const next = [...prev.hiveHostPorts];
+      next[index] = { ...next[index], [field]: value };
+      return { ...prev, hiveHostPorts: next };
+    });
+  };
+
+  const addHiveHostPort = () => {
+    setFormData((prev) => {
+      if (prev.hiveHostPorts.length >= maxHiveHostPorts) return prev;
+      return { ...prev, hiveHostPorts: [...prev.hiveHostPorts, { host: '', port: '' }] };
+    });
+  };
+
+  const removeHiveHostPort = (index: number) => {
+    setFormData((prev) => {
+      if (prev.hiveHostPorts.length <= 1) return prev;
+      const next = prev.hiveHostPorts.filter((_, i) => i !== index);
+      return { ...prev, hiveHostPorts: next };
+    });
   };
 
   const handlePurposeChange = (purpose: string) => {
@@ -186,35 +218,87 @@ const CreateConnectorModal: React.FC<CreateConnectorModalProps> = ({
               <div className="form-label">连接信息:</div>
               <div className="form-control">
                 <div className="connection-panel">
-                  <>
-                    <div className="panel-row">
-                      <div className="panel-label">
-                        <span className="required">*</span>主机
-                        <span className="help">?</span>
+                  {isHive ? (
+                    <>
+                      {formData.hiveHostPorts.map((hp, index) => (
+                        <div key={index} className="hive-host-port-row">
+                          <div className="panel-row hive-host-port-fields">
+                            <div className="panel-label">
+                              <span className="required">*</span>主机
+                              <span className="help">?</span>
+                            </div>
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder={hostPlaceholder}
+                              value={hp.host}
+                              onChange={(e) => updateHiveHostPort(index, 'host', e.target.value)}
+                            />
+                          </div>
+                          <div className="panel-row hive-host-port-fields">
+                            <div className="panel-label">
+                              <span className="required">*</span>端口
+                              <span className="help">?</span>
+                            </div>
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder={portPlaceholder}
+                              value={hp.port}
+                              onChange={(e) => updateHiveHostPort(index, 'port', e.target.value)}
+                            />
+                          </div>
+                          {formData.hiveHostPorts.length > 1 && (
+                            <button
+                              type="button"
+                              className="hive-host-port-remove"
+                              onClick={() => removeHiveHostPort(index)}
+                              aria-label="删除"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {formData.hiveHostPorts.length < maxHiveHostPorts && (
+                        <button type="button" className="hive-add-host-port" onClick={addHiveHostPort}>
+                          添加主机端口
+                        </button>
+                      )}
+                      {formData.hiveHostPorts.length >= maxHiveHostPorts && (
+                        <span className="hive-host-port-hint">最多支持 {maxHiveHostPorts} 组主机端口</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="panel-row">
+                        <div className="panel-label">
+                          <span className="required">*</span>主机
+                          <span className="help">?</span>
+                        </div>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder={hostPlaceholder}
+                          value={formData.host}
+                          onChange={(e) => handleInputChange('host', e.target.value)}
+                        />
                       </div>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder={hostPlaceholder}
-                        value={formData.host}
-                        onChange={(e) => handleInputChange('host', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="panel-row">
-                      <div className="panel-label">
-                        <span className="required">*</span>端口
-                        <span className="help">?</span>
+                      <div className="panel-row">
+                        <div className="panel-label">
+                          <span className="required">*</span>端口
+                          <span className="help">?</span>
+                        </div>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder={portPlaceholder}
+                          value={formData.port}
+                          onChange={(e) => handleInputChange('port', e.target.value)}
+                        />
                       </div>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder={portPlaceholder}
-                        value={formData.port}
-                        onChange={(e) => handleInputChange('port', e.target.value)}
-                      />
-                    </div>
-                  </>
+                    </>
+                  )}
 
                   {isHive && (
                     <>
