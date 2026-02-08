@@ -70,6 +70,11 @@ const Sidebar: React.FC = () => {
           />
         </svg>
       ),
+      expanded: true,
+      children: [
+        { id: 'data-center', label: '数据中心', path: '/data-center' },
+        { id: 'data-exploration', label: '数据探索', path: '/data-exploration' },
+      ],
     },
     {
       id: 'alert',
@@ -106,6 +111,13 @@ const Sidebar: React.FC = () => {
     );
   }, [location.pathname]);
 
+  const activeDataManagement = useMemo(() => {
+    return (
+      location.pathname.startsWith('/data-center') ||
+      location.pathname.startsWith('/data-exploration')
+    );
+  }, [location.pathname]);
+
   const toggleMenu = (id: string) => {
     setMenuItems((items) =>
       items.map((item) =>
@@ -121,7 +133,7 @@ const Sidebar: React.FC = () => {
           {menuItems.map((item) => (
             <div key={item.id}>
               <div
-                className={`menu-item ${item.children ? 'has-children' : ''} ${item.expanded ? 'expanded' : ''} ${item.id === 'data-connection' && activeDataConnection ? 'active-parent' : ''}`}
+                className={`menu-item ${item.children ? 'has-children' : ''} ${item.expanded ? 'expanded' : ''} ${(item.id === 'data-connection' && activeDataConnection) || (item.id === 'data-management' && activeDataManagement) ? 'active-parent' : ''}`}
                 onClick={() => item.children && toggleMenu(item.id)}
               >
                 <span className="menu-icon">{item.icon}</span>
