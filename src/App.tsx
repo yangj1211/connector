@@ -6,6 +6,8 @@ import DataLoadList from './components/DataLoadList';
 import DataLoadDetail from './components/DataLoadDetail';
 import DataLoadCreate from './components/DataLoadCreate';
 import DataExportList from './components/DataExportList';
+import DataExploration from './components/DataExploration';
+import CreateKnowledgeBase from './components/CreateKnowledgeBase';
 import './App.css';
 
 const App: React.FC = () => {
@@ -20,6 +22,8 @@ const App: React.FC = () => {
             <Route path="data-load/new" element={<DataLoadCreate />} />
             <Route path="data-load/:id" element={<DataLoadDetail />} />
             <Route path="data-export" element={<DataExportList />} />
+            <Route path="data-exploration" element={<DataExploration />} />
+            <Route path="create-knowledge-base" element={<CreateKnowledgeBase />} />
           </Route>
           <Route path="*" element={<Navigate to="/connectors" replace />} />
         </Routes>
