@@ -252,7 +252,7 @@ const CreateKnowledgeBase: React.FC = () => {
                             className={`advanced-nav-item ${activeAdvancedTab === 'sql_mapping' ? 'active' : ''}`}
                             onClick={() => setActiveAdvancedTab('sql_mapping')}
                           >
-                            语义SQL
+                            SQL结果集
                           </div>
                           <div
                             className={`advanced-nav-item ${activeAdvancedTab === 'optimization' ? 'active' : ''}`}
@@ -284,7 +284,7 @@ const CreateKnowledgeBase: React.FC = () => {
                         <div className="terminology-search">
                           <input
                             type="text"
-                            placeholder="搜索知识名称"
+                            placeholder="搜索结果集名称"
                             value={searchKeyword}
                             onChange={(e) => setSearchKeyword(e.target.value)}
                           />
@@ -423,15 +423,22 @@ const CreateKnowledgeBase: React.FC = () => {
                   )}
                   {activeAdvancedTab === 'sql_mapping' && (
                     <div className="terminology-content">
-                      <h3 className="terminology-title">语义SQL</h3>
+                      <h3 className="terminology-title">SQL结果集</h3>
                       <p className="terminology-desc">
-                        配置自然语言与SQL的语义映射关系，帮助MOI更好地理解用户意图并生成准确的SQL查询。
+                      定义SQL结果集的业务语义映射，为自然语言查询提供数据上下文理解。
                       </p>
+                      <div className="sql-mapping-reminder">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="reminder-icon">
+                          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                          <path d="M8 7v4M8 5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                        <span><strong>提醒：</strong>如需引用已定义的SQL结果集，请使用 {'{'}结果集名称{'}'} 格式在「业务逻辑」处进行调用。</span>
+                      </div>
                       <div className="terminology-toolbar">
                         <div className="terminology-search">
                           <input
                             type="text"
-                            placeholder="搜索知识名称"
+                            placeholder="搜索结果集名称"
                             value={searchKeyword}
                             onChange={(e) => setSearchKeyword(e.target.value)}
                           />
@@ -444,14 +451,14 @@ const CreateKnowledgeBase: React.FC = () => {
                           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                             <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                           </svg>
-                          新增语义SQL
+                          新增SQL结果集
                         </button>
                       </div>
                       <div className="terminology-table-wrapper">
                         <table className="terminology-table">
                           <thead>
                             <tr>
-                              <th>语义SQL名称</th>
+                              <th>结果集名称</th>
                               <th>SQL</th>
                               <th>描述</th>
                               <th>操作</th>
@@ -627,7 +634,7 @@ const CreateKnowledgeBase: React.FC = () => {
         </div>
       )}
 
-      {/* 新增知识 / 新增SQL定义 弹窗 */}
+      {/* 新增知识 / 新增SQL结果集定义 弹窗 */}
       {showAddKnowledgeModal && (
         <div className="add-knowledge-modal-overlay" onClick={closeAddKnowledgeModal}>
           <div className="add-knowledge-modal" onClick={(e) => e.stopPropagation()}>
@@ -640,7 +647,7 @@ const CreateKnowledgeBase: React.FC = () => {
                       ? '编辑逻辑解释'
                       : '编辑知识'
                   : addKnowledgeSource === 'sql_mapping'
-                    ? '新增SQL定义'
+                    ? '新增SQL结果集定义'
                     : addKnowledgeSource === 'logic'
                       ? '新增逻辑解释'
                       : '新增知识'}
@@ -699,12 +706,12 @@ const CreateKnowledgeBase: React.FC = () => {
                 <>
                   <div className="add-knowledge-form-group">
                     <label className="add-knowledge-label required">
-                      {addKnowledgeSource === 'sql_mapping' ? '语义SQL名称' : '知识名称'}
+                      {addKnowledgeSource === 'sql_mapping' ? '结果集名称' : '知识名称'}
                     </label>
                     <input
                       type="text"
                       className="add-knowledge-input"
-                      placeholder={addKnowledgeSource === 'sql_mapping' ? '请输入语义SQL名称' : '请输入知识名称'}
+                      placeholder={addKnowledgeSource === 'sql_mapping' ? '请输入结果集名称' : '请输入知识名称'}
                       value={addKnowledgeName}
                       onChange={(e) => setAddKnowledgeName(e.target.value)}
                     />

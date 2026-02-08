@@ -792,6 +792,33 @@
   border-radius: 6px;
 }
 
+.sql-mapping-reminder {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+}
+
+.sql-mapping-reminder .reminder-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #2f6eea;
+}
+
+.sql-mapping-reminder span {
+  font-size: 13px;
+  color: #1e40af;
+  line-height: 1.5;
+}
+
+.sql-mapping-reminder strong {
+  color: #1e40af;
+  font-weight: 600;
+}
+
 .logic-example svg {
   color: #2f6eea;
   flex-shrink: 0;
