@@ -1,6 +1,47 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGlobalColumnSemantics } from '../contexts/GlobalColumnSemanticsContext';
 import './CreateKnowledgeBase.css';
+
+type TableColumn = { name: string; comment: string };
+
+function getMockTableColumns(tableName: string): TableColumn[] {
+  const presets: Record<string, TableColumn[]> = {
+    jst_flat_table: [
+      { name: 'id', comment: '主键ID' },
+      { name: 'revenue', comment: '收入金额' },
+      { name: 'cost', comment: '成本金额' },
+      { name: 'created_at', comment: '创建时间' },
+    ],
+    jinpan_catalog: [
+      { name: 'catalog_id', comment: '目录编码' },
+      { name: 'catalog_name', comment: '目录名称' },
+      { name: 'status', comment: '状态' },
+    ],
+    dwd_dcp: [
+      { name: 'id', comment: '主键' },
+      { name: 'name', comment: '名称' },
+      { name: 'created_at', comment: '创建时间' },
+    ],
+    dws_dcp: [
+      { name: 'id', comment: '主键' },
+      { name: 'name', comment: '名称' },
+      { name: 'updated_at', comment: '更新时间' },
+    ],
+    dwd_secrecy: [
+      { name: 'id', comment: '主键' },
+      { name: 'name', comment: '名称' },
+    ],
+  };
+  return (
+    presets[tableName] ?? [
+      { name: 'id', comment: '主键' },
+      { name: 'name', comment: '名称' },
+      { name: 'created_at', comment: '创建时间' },
+      { name: 'updated_at', comment: '更新时间' },
+    ]
+  );
+}
 
 const CreateKnowledgeBase: React.FC = () => {
   const navigate = useNavigate();
@@ -24,10 +65,17 @@ const CreateKnowledgeBase: React.FC = () => {
   const [activeAdvancedTab, setActiveAdvancedTab] = useState('terminology');
   const [showNL2SQLConfig, setShowNL2SQLConfig] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [columnSemantics, setColumnSemantics] = useState<Record<string, Record<string, string>>>({});
+  const [columnSemanticsEnabled, setColumnSemanticsEnabled] = useState<Record<string, Record<string, boolean>>>({});
+  const [columnSemanticsModalTableId, setColumnSemanticsModalTableId] = useState<string | null>(null);
+  const [columnSemanticsModalColumnSearch, setColumnSemanticsModalColumnSearch] = useState('');
+  const [columnSemanticsSearchKeyword, setColumnSemanticsSearchKeyword] = useState('');
+  const { globalColumnSemantics } = useGlobalColumnSemantics();
 
   type TreeNode = {
     id: string;
     name: string;
+    description?: string;
     expandable?: boolean;
     selectable?: boolean;
     children?: TreeNode[];
@@ -43,18 +91,57 @@ const CreateKnowledgeBase: React.FC = () => {
       children: [
         { id: 'gongsi', name: '公司公告', expandable: true, selectable: false },
         { id: 'gongsi_result', name: '公司公告解析结果', expandable: true, selectable: false },
-        { id: 'jst_flat', name: 'jst_flat_table', selectable: true },
-        { id: 'jinpan_catalog', name: 'jinpan_catalog', selectable: true },
-        { id: 'dwd_dcp', name: 'dwd_dcp', selectable: true },
-        { id: 'dws_dcp', name: 'dws_dcp', selectable: true },
+        { id: 'jst_flat', name: 'jst_flat_table', description: '金盘问数扁平表', selectable: true },
+        { id: 'jinpan_catalog', name: 'jinpan_catalog', description: '金盘目录表', selectable: true },
+        { id: 'dwd_dcp', name: 'dwd_dcp', description: 'DCP 明细层', selectable: true },
+        { id: 'dws_dcp', name: 'dws_dcp', description: 'DCP 汇总层', selectable: true },
         { id: 'dwd_load', name: 'dwd_load', selectable: false },
-        { id: 'dwd_secrecy', name: 'dwd_secrecy', selectable: true },
+        { id: 'dwd_secrecy', name: 'dwd_secrecy', description: '保密明细表', selectable: true },
       ],
     },
   ];
 
+  const flattenSelectableTables = (nodes: TreeNode[]): { id: string; name: string; description: string }[] => {
+    const result: { id: string; name: string; description: string }[] = [];
+    nodes.forEach((n) => {
+      if (n.selectable && n.id) result.push({ id: n.id, name: n.name, description: n.description ?? '' });
+      if (n.children && n.children.length) result.push(...flattenSelectableTables(n.children));
+    });
+    return result;
+  };
+
+  const selectedTables = useMemo(() => {
+    const all = flattenSelectableTables(dataSourceTree);
+    return all.filter((t) => selectedDataSources.includes(t.id));
+  }, [selectedDataSources]);
+
+  const filteredColumnSemanticsTables = useMemo(() => {
+    if (!columnSemanticsSearchKeyword.trim()) return selectedTables;
+    const kw = columnSemanticsSearchKeyword.trim().toLowerCase();
+    return selectedTables.filter((t) => t.name.toLowerCase().includes(kw) || (t.description && t.description.toLowerCase().includes(kw)));
+  }, [selectedTables, columnSemanticsSearchKeyword]);
+
   const toggleExpand = (id: string) => {
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleColumnSemanticChange = (tableId: string, columnName: string, value: string) => {
+    setColumnSemantics((prev) => ({
+      ...prev,
+      [tableId]: { ...(prev[tableId] ?? {}), [columnName]: value },
+    }));
+  };
+
+  const handleColumnSemanticEnabledToggle = (tableId: string, columnName: string) => {
+    setColumnSemanticsEnabled((prev) => ({
+      ...prev,
+      [tableId]: { ...(prev[tableId] ?? {}), [columnName]: !(prev[tableId]?.[columnName] ?? true) },
+    }));
+  };
+
+  const closeColumnSemanticsModal = () => {
+    setColumnSemanticsModalTableId(null);
+    setColumnSemanticsModalColumnSearch('');
   };
 
   const handleDataSourceToggle = (id: string) => {
@@ -253,6 +340,12 @@ const CreateKnowledgeBase: React.FC = () => {
                             onClick={() => setActiveAdvancedTab('sql_mapping')}
                           >
                             SQL结果集
+                          </div>
+                          <div
+                            className={`advanced-nav-item ${activeAdvancedTab === 'column_semantics' ? 'active' : ''}`}
+                            onClick={() => setActiveAdvancedTab('column_semantics')}
+                          >
+                            列语义
                           </div>
                           <div
                             className={`advanced-nav-item ${activeAdvancedTab === 'optimization' ? 'active' : ''}`}
@@ -497,6 +590,79 @@ const CreateKnowledgeBase: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  {activeAdvancedTab === 'column_semantics' && (
+                    <div className="terminology-content">
+                      <h3 className="terminology-title">列语义</h3>
+                      <p className="terminology-desc">
+                        配置本知识库内表中各列的语义信息，仅在本知识库生效，帮助 NL2SQL 更准确理解列含义与使用场景。
+                      </p>
+                      <div className="sql-mapping-reminder">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="reminder-icon">
+                          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                          <path d="M8 7v4M8 5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                        <span><strong>提醒：</strong>请先在「选择数据源」中勾选表，下方将展示已选表，点击「配置列语义」可为每列配置本知识库内的语义。</span>
+                      </div>
+                      <div className="terminology-toolbar">
+                        <div className="terminology-search">
+                          <input
+                            type="text"
+                            placeholder="搜索表名"
+                            value={columnSemanticsSearchKeyword}
+                            onChange={(e) => setColumnSemanticsSearchKeyword(e.target.value)}
+                          />
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+                            <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="terminology-table-wrapper">
+                        <table className="terminology-table">
+                          <thead>
+                            <tr>
+                              <th>表名</th>
+                              <th>表描述</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredColumnSemanticsTables.length === 0 ? (
+                              <tr>
+                                <td colSpan={3} className="empty-state">
+                                  <div className="empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                      <circle cx="24" cy="24" r="20" stroke="#D1D5DB" strokeWidth="2" />
+                                      <path d="M24 16v16M16 24h16" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" />
+                                    </svg>
+                                  </div>
+                                  <p className="empty-text">暂无数据</p>
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredColumnSemanticsTables.map((table) => (
+                                <tr key={table.id}>
+                                  <td>{table.name}</td>
+                                  <td>{table.description || '-'}</td>
+                                  <td>
+                                    <div className="table-actions">
+                                      <button
+                                        type="button"
+                                        className="action-btn edit"
+                                        onClick={() => setColumnSemanticsModalTableId(table.id)}
+                                      >
+                                        配置列语义
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                   {activeAdvancedTab === 'optimization' && (
                     <div className="terminology-content">
                       <h3 className="terminology-title">优化案例管理</h3>
@@ -633,6 +799,133 @@ const CreateKnowledgeBase: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 配置列语义弹窗 */}
+      {columnSemanticsModalTableId && (() => {
+        const table = selectedTables.find((t) => t.id === columnSemanticsModalTableId);
+        if (!table) return null;
+        const allColumns = getMockTableColumns(table.name);
+        const kw = columnSemanticsModalColumnSearch.trim().toLowerCase();
+        const columns = kw
+          ? allColumns.filter((c) => c.name.toLowerCase().includes(kw) || c.comment.toLowerCase().includes(kw))
+          : allColumns;
+        return (
+          <div className="add-knowledge-modal-overlay" onClick={closeColumnSemanticsModal}>
+            <div className="add-knowledge-modal column-semantics-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="add-knowledge-modal-header">
+                <h3>配置列语义 - {table.name}</h3>
+                <button
+                  type="button"
+                  className="modal-close-btn"
+                  onClick={closeColumnSemanticsModal}
+                  aria-label="关闭"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+              <div className="add-knowledge-modal-body">
+                <div className="column-semantics-modal-search">
+                  <input
+                    type="text"
+                    placeholder="搜索列名"
+                    value={columnSemanticsModalColumnSearch}
+                    onChange={(e) => setColumnSemanticsModalColumnSearch(e.target.value)}
+                  />
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="terminology-table-wrapper">
+                  <table className="terminology-table column-semantics-table">
+                    <thead>
+                      <tr>
+                        <th>列名</th>
+                        <th>列 Comment</th>
+                        <th>全局语义</th>
+                        <th>列语义</th>
+                        <th>启用</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {columns.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="empty-state">
+                            <p className="empty-text">无匹配列</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        columns.map((col) => (
+                          <tr key={col.name}>
+                            <td>
+                              <input
+                                type="text"
+                                className="column-semantics-input readonly"
+                                value={col.name}
+                                readOnly
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                className="column-semantics-input readonly"
+                                value={col.comment}
+                                readOnly
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                className="column-semantics-input readonly"
+                                placeholder="在数据中心配置"
+                                value={globalColumnSemantics[table.name]?.[col.name] ?? ''}
+                                readOnly
+                                title="全局语义需在「数据中心」中配置"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                className={`column-semantics-input ${columnSemanticsEnabled[table.id]?.[col.name] === false ? 'disabled' : ''}`}
+                                placeholder="请输入本知识库内该列的语义"
+                                value={columnSemantics[table.id]?.[col.name] ?? ''}
+                                onChange={(e) => handleColumnSemanticChange(table.id, col.name, e.target.value)}
+                                disabled={columnSemanticsEnabled[table.id]?.[col.name] === false}
+                              />
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={columnSemanticsEnabled[table.id]?.[col.name] !== false}
+                                title={columnSemanticsEnabled[table.id]?.[col.name] !== false ? '已启用' : '已禁用，不会被用于检索'}
+                                className={`kb-column-semantics-switch ${columnSemanticsEnabled[table.id]?.[col.name] !== false ? 'kb-column-semantics-switch-on' : ''}`}
+                                onClick={() => handleColumnSemanticEnabledToggle(table.id, col.name)}
+                              >
+                                <span className="kb-column-semantics-switch-knob" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="add-knowledge-modal-footer">
+                <button type="button" className="cancel-btn" onClick={closeColumnSemanticsModal}>
+                  取消
+                </button>
+                <button type="button" className="create-btn" onClick={closeColumnSemanticsModal}>
+                  确定
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 新增知识 / 新增SQL结果集定义 弹窗 */}
       {showAddKnowledgeModal && (
