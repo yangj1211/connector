@@ -167,6 +167,10 @@
   overflow: hidden;
 }
 
+.add-knowledge-modal.add-knowledge-modal-logic {
+  border: 1px solid #bfdbfe;
+}
+
 .add-knowledge-modal.column-semantics-modal {
   max-width: 640px;
   max-height: 85vh;
@@ -175,6 +179,24 @@
 .add-knowledge-modal.column-semantics-modal .add-knowledge-modal-body {
   max-height: 60vh;
   overflow-y: auto;
+}
+
+.column-semantics-table-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.column-semantics-table-comment {
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #374151;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  line-height: 1.5;
+  min-height: 40px;
+  box-sizing: border-box;
 }
 
 .column-semantics-modal-search {
@@ -212,7 +234,7 @@
   pointer-events: none;
 }
 
-/* 列语义启用开关 */
+/* 表和列补充说明启用开关 */
 .kb-column-semantics-switch {
   position: relative;
   width: 40px;
@@ -339,6 +361,165 @@
   color: #9ca3af;
 }
 
+.add-knowledge-select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  transition: all 0.2s;
+  box-sizing: border-box;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+}
+
+.add-knowledge-select:focus {
+  border-color: #2f6eea;
+  box-shadow: 0 0 0 3px rgba(47, 110, 234, 0.1);
+}
+
+.logic-related-tables-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.logic-related-tables-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+  text-align: left;
+}
+
+.logic-related-tables-trigger:hover {
+  border-color: #9ca3af;
+}
+
+.logic-related-tables-trigger:focus {
+  border-color: #2f6eea;
+  box-shadow: 0 0 0 3px rgba(47, 110, 234, 0.1);
+}
+
+.logic-related-tables-trigger-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logic-related-tables-chevron {
+  flex-shrink: 0;
+  margin-left: 8px;
+  color: #6b7280;
+  transition: transform 0.2s;
+}
+
+.logic-related-tables-chevron.open {
+  transform: rotate(180deg);
+}
+
+.logic-related-tables-panel {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.logic-related-tables-search {
+  position: relative;
+  flex-shrink: 0;
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.logic-related-tables-search input {
+  width: 100%;
+  padding: 6px 28px 6px 10px;
+  font-size: 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.logic-related-tables-search input:focus {
+  border-color: #2f6eea;
+}
+
+.logic-related-tables-search input::placeholder {
+  color: #9ca3af;
+}
+
+.logic-related-tables-search svg {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.logic-related-tables-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+
+.logic-related-tables-option:hover {
+  background: #f3f4f6;
+}
+
+.logic-related-tables-option.selected {
+  color: #111827;
+}
+
+.logic-related-tables-check-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.logic-related-tables-check {
+  width: 14px;
+  height: 14px;
+  color: #111827;
+}
+
+.logic-related-tables-option > span:last-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Logic Type Options */
 .logic-type-options {
   display: flex;
@@ -369,6 +550,10 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
+}
+
+.logic-type-card-header .logic-type-radio {
+  margin-left: auto;
 }
 
 .logic-type-radio {
@@ -870,7 +1055,7 @@
   line-height: 1.5;
 }
 
-/* 列语义：选中表与列配置 */
+/* 表和列补充说明：选中表与列配置 */
 .column-semantics-empty {
   margin-top: 16px;
   padding: 24px;
