@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGlobalColumnSemantics } from '../contexts/GlobalColumnSemanticsContext';
 import './CreateKnowledgeBase.css';
 
 type TableColumn = { name: string; comment: string };
@@ -56,10 +55,11 @@ const CreateKnowledgeBase: React.FC = () => {
   const [addKnowledgeDesc, setAddKnowledgeDesc] = useState('');
   const [addKnowledgeSql, setAddKnowledgeSql] = useState('');
   const [addLogicType, setAddLogicType] = useState('系统智能判断');
+  const [addLogicRelatedTables, setAddLogicRelatedTables] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [terminologyList, setTerminologyList] = useState<{ id: string; name: string; desc: string }[]>([]);
   const [sqlMappingList, setSqlMappingList] = useState<{ id: string; name: string; desc: string; sql: string }[]>([]);
-  const [logicList, setLogicList] = useState<{ id: string; explanation: string; type: string }[]>([]);
+  const [logicList, setLogicList] = useState<{ id: string; explanation: string; type: string; relatedTables?: string }[]>([]);
   const [logicSearchKeyword, setLogicSearchKeyword] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({ jinpan: true });
   const [activeAdvancedTab, setActiveAdvancedTab] = useState('terminology');
@@ -70,7 +70,10 @@ const CreateKnowledgeBase: React.FC = () => {
   const [columnSemanticsModalTableId, setColumnSemanticsModalTableId] = useState<string | null>(null);
   const [columnSemanticsModalColumnSearch, setColumnSemanticsModalColumnSearch] = useState('');
   const [columnSemanticsSearchKeyword, setColumnSemanticsSearchKeyword] = useState('');
-  const { globalColumnSemantics } = useGlobalColumnSemantics();
+  const [tableSupplementNotes, setTableSupplementNotes] = useState<Record<string, string>>({});
+  const [logicRelatedTablesDropdownOpen, setLogicRelatedTablesDropdownOpen] = useState(false);
+  const [logicRelatedTablesSearchKeyword, setLogicRelatedTablesSearchKeyword] = useState('');
+  const logicRelatedTablesDropdownRef = useRef<HTMLDivElement>(null);
 
   type TreeNode = {
     id: string;
@@ -139,6 +142,10 @@ const CreateKnowledgeBase: React.FC = () => {
     }));
   };
 
+  const handleTableSupplementNoteChange = (tableId: string, value: string) => {
+    setTableSupplementNotes((prev) => ({ ...prev, [tableId]: value }));
+  };
+
   const closeColumnSemanticsModal = () => {
     setColumnSemanticsModalTableId(null);
     setColumnSemanticsModalColumnSearch('');
@@ -174,7 +181,7 @@ const CreateKnowledgeBase: React.FC = () => {
 
   const openAddKnowledgeModal = (
     source: 'terminology' | 'sql_mapping' | 'logic',
-    item?: { id: string; name?: string; desc?: string; sql?: string; explanation?: string; type?: string }
+    item?: { id: string; name?: string; desc?: string; sql?: string; explanation?: string; type?: string; relatedTables?: string }
   ) => {
     setAddKnowledgeSource(source);
     setEditingId(item?.id ?? null);
@@ -182,6 +189,11 @@ const CreateKnowledgeBase: React.FC = () => {
     setAddKnowledgeDesc(item?.desc ?? '');
     setAddKnowledgeSql(item?.sql ?? '');
     setAddLogicType(item?.type ?? '系统智能判断');
+    setAddLogicRelatedTables(
+      item?.relatedTables === '全部' || !item?.relatedTables
+        ? []
+        : item.relatedTables.split(',').filter(Boolean)
+    );
     setShowAddKnowledgeModal(true);
   };
 
@@ -189,7 +201,21 @@ const CreateKnowledgeBase: React.FC = () => {
     setShowAddKnowledgeModal(false);
     setEditingId(null);
     setAddLogicType('');
+    setAddLogicRelatedTables([]);
+    setLogicRelatedTablesDropdownOpen(false);
+    setLogicRelatedTablesSearchKeyword('');
   };
+
+  useEffect(() => {
+    if (!logicRelatedTablesDropdownOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (logicRelatedTablesDropdownRef.current && !logicRelatedTablesDropdownRef.current.contains(e.target as Node)) {
+        setLogicRelatedTablesDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [logicRelatedTablesDropdownOpen]);
 
   const handleAddKnowledgeConfirm = () => {
     if (addKnowledgeSource === 'sql_mapping') {
@@ -200,7 +226,12 @@ const CreateKnowledgeBase: React.FC = () => {
       );
     } else if (addKnowledgeSource === 'logic') {
       if (!addKnowledgeName.trim() || !addLogicType.trim()) return;
-      const item = { id: editingId || `logic-${Date.now()}`, explanation: addKnowledgeName.trim(), type: addLogicType.trim() };
+      const item = {
+        id: editingId || `logic-${Date.now()}`,
+        explanation: addKnowledgeName.trim(),
+        type: addLogicType.trim(),
+        relatedTables: addLogicRelatedTables.length === 0 ? '全部' : addLogicRelatedTables.join(','),
+      };
       setLogicList((prev) =>
         editingId ? prev.map((i) => (i.id === editingId ? item : i)) : [...prev, item]
       );
@@ -336,16 +367,16 @@ const CreateKnowledgeBase: React.FC = () => {
                             业务逻辑
                           </div>
                           <div
+                            className={`advanced-nav-item ${activeAdvancedTab === 'column_semantics' ? 'active' : ''}`}
+                            onClick={() => setActiveAdvancedTab('column_semantics')}
+                          >
+                            表和列补充说明
+                          </div>
+                          <div
                             className={`advanced-nav-item ${activeAdvancedTab === 'sql_mapping' ? 'active' : ''}`}
                             onClick={() => setActiveAdvancedTab('sql_mapping')}
                           >
                             SQL结果集
-                          </div>
-                          <div
-                            className={`advanced-nav-item ${activeAdvancedTab === 'column_semantics' ? 'active' : ''}`}
-                            onClick={() => setActiveAdvancedTab('column_semantics')}
-                          >
-                            列语义
                           </div>
                           <div
                             className={`advanced-nav-item ${activeAdvancedTab === 'optimization' ? 'active' : ''}`}
@@ -478,6 +509,7 @@ const CreateKnowledgeBase: React.FC = () => {
                           <thead>
                             <tr>
                               <th>业务逻辑解释</th>
+                              <th>关联的表</th>
                               <th>业务逻辑类型</th>
                               <th>操作</th>
                             </tr>
@@ -485,7 +517,7 @@ const CreateKnowledgeBase: React.FC = () => {
                           <tbody>
                             {logicList.length === 0 ? (
                               <tr>
-                                <td colSpan={3} className="empty-state">
+                                <td colSpan={4} className="empty-state">
                                   <div className="empty-icon">
                                     <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
                                       <circle cx="24" cy="24" r="20" stroke="#D1D5DB" strokeWidth="2" />
@@ -499,11 +531,92 @@ const CreateKnowledgeBase: React.FC = () => {
                               logicList.map((item) => (
                                 <tr key={item.id}>
                                   <td>{item.explanation}</td>
+                                  <td>
+                                    {item.relatedTables === '全部' || !item.relatedTables
+                                      ? '全部'
+                                      : item.relatedTables
+                                          .split(',')
+                                          .map((id) => selectedTables.find((t) => t.id === id)?.name ?? id)
+                                          .join('、')}
+                                  </td>
                                   <td>{item.type}</td>
                                   <td>
                                     <div className="table-actions">
-                                      <button type="button" className="action-btn edit" onClick={() => openAddKnowledgeModal('logic', { id: item.id, explanation: item.explanation, type: item.type })}>编辑</button>
+                                      <button type="button" className="action-btn edit" onClick={() => openAddKnowledgeModal('logic', { id: item.id, explanation: item.explanation, type: item.type, relatedTables: item.relatedTables })}>编辑</button>
                                       <button type="button" className="action-btn delete" onClick={() => handleDeleteKnowledge('logic', item.id)}>删除</button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                  {activeAdvancedTab === 'column_semantics' && (
+                    <div className="terminology-content">
+                      <h3 className="terminology-title">表和列补充说明</h3>
+                      <p className="terminology-desc">
+                        配置各表和列的补充说明，仅在本知识库内生效，帮助 NL2SQL 更准确理解表和列含义与使用场景。
+                      </p>
+                      <div className="sql-mapping-reminder">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="reminder-icon">
+                          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                          <path d="M8 7v4M8 5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                        <span><strong>提醒：</strong>请先在「选择数据源」中勾选表，下方将展示已选表，点击「编辑」可为每列配置表和列补充说明。</span>
+                      </div>
+                      <div className="terminology-toolbar">
+                        <div className="terminology-search">
+                          <input
+                            type="text"
+                            placeholder="搜索表名"
+                            value={columnSemanticsSearchKeyword}
+                            onChange={(e) => setColumnSemanticsSearchKeyword(e.target.value)}
+                          />
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+                            <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="terminology-table-wrapper">
+                        <table className="terminology-table">
+                          <thead>
+                            <tr>
+                              <th>表名</th>
+                              <th>表描述</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredColumnSemanticsTables.length === 0 ? (
+                              <tr>
+                                <td colSpan={3} className="empty-state">
+                                  <div className="empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                      <circle cx="24" cy="24" r="20" stroke="#D1D5DB" strokeWidth="2" />
+                                      <path d="M24 16v16M16 24h16" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" />
+                                    </svg>
+                                  </div>
+                                  <p className="empty-text">暂无数据</p>
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredColumnSemanticsTables.map((table) => (
+                                <tr key={table.id}>
+                                  <td>{table.name}</td>
+                                  <td>{table.description || '-'}</td>
+                                  <td>
+                                    <div className="table-actions">
+                                      <button
+                                        type="button"
+                                        className="action-btn edit"
+                                        onClick={() => setColumnSemanticsModalTableId(table.id)}
+                                      >
+                                        编辑
+                                      </button>
                                     </div>
                                   </td>
                                 </tr>
@@ -580,79 +693,6 @@ const CreateKnowledgeBase: React.FC = () => {
                                     <div className="table-actions">
                                       <button type="button" className="action-btn edit" onClick={() => openAddKnowledgeModal('sql_mapping', item)}>编辑</button>
                                       <button type="button" className="action-btn delete" onClick={() => handleDeleteKnowledge('sql_mapping', item.id)}>删除</button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                  {activeAdvancedTab === 'column_semantics' && (
-                    <div className="terminology-content">
-                      <h3 className="terminology-title">列语义</h3>
-                      <p className="terminology-desc">
-                        配置本知识库内表中各列的语义信息，仅在本知识库生效，帮助 NL2SQL 更准确理解列含义与使用场景。
-                      </p>
-                      <div className="sql-mapping-reminder">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="reminder-icon">
-                          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-                          <path d="M8 7v4M8 5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                        <span><strong>提醒：</strong>请先在「选择数据源」中勾选表，下方将展示已选表，点击「配置列语义」可为每列配置本知识库内的语义。</span>
-                      </div>
-                      <div className="terminology-toolbar">
-                        <div className="terminology-search">
-                          <input
-                            type="text"
-                            placeholder="搜索表名"
-                            value={columnSemanticsSearchKeyword}
-                            onChange={(e) => setColumnSemanticsSearchKeyword(e.target.value)}
-                          />
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-                            <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="terminology-table-wrapper">
-                        <table className="terminology-table">
-                          <thead>
-                            <tr>
-                              <th>表名</th>
-                              <th>表描述</th>
-                              <th>操作</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredColumnSemanticsTables.length === 0 ? (
-                              <tr>
-                                <td colSpan={3} className="empty-state">
-                                  <div className="empty-icon">
-                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                                      <circle cx="24" cy="24" r="20" stroke="#D1D5DB" strokeWidth="2" />
-                                      <path d="M24 16v16M16 24h16" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" />
-                                    </svg>
-                                  </div>
-                                  <p className="empty-text">暂无数据</p>
-                                </td>
-                              </tr>
-                            ) : (
-                              filteredColumnSemanticsTables.map((table) => (
-                                <tr key={table.id}>
-                                  <td>{table.name}</td>
-                                  <td>{table.description || '-'}</td>
-                                  <td>
-                                    <div className="table-actions">
-                                      <button
-                                        type="button"
-                                        className="action-btn edit"
-                                        onClick={() => setColumnSemanticsModalTableId(table.id)}
-                                      >
-                                        配置列语义
-                                      </button>
                                     </div>
                                   </td>
                                 </tr>
@@ -800,7 +840,7 @@ const CreateKnowledgeBase: React.FC = () => {
         </div>
       )}
 
-      {/* 配置列语义弹窗 */}
+      {/* 配置表和列补充说明弹窗 */}
       {columnSemanticsModalTableId && (() => {
         const table = selectedTables.find((t) => t.id === columnSemanticsModalTableId);
         if (!table) return null;
@@ -813,7 +853,7 @@ const CreateKnowledgeBase: React.FC = () => {
           <div className="add-knowledge-modal-overlay" onClick={closeColumnSemanticsModal}>
             <div className="add-knowledge-modal column-semantics-modal" onClick={(e) => e.stopPropagation()}>
               <div className="add-knowledge-modal-header">
-                <h3>配置列语义 - {table.name}</h3>
+                <h3>配置表和列补充说明 - {table.name}</h3>
                 <button
                   type="button"
                   className="modal-close-btn"
@@ -826,6 +866,22 @@ const CreateKnowledgeBase: React.FC = () => {
                 </button>
               </div>
               <div className="add-knowledge-modal-body">
+                <div className="column-semantics-table-section">
+                  <div className="add-knowledge-form-group">
+                    <label className="add-knowledge-label">表描述</label>
+                    <div className="column-semantics-table-comment">{table.description || '-'}</div>
+                  </div>
+                  <div className="add-knowledge-form-group">
+                    <label className="add-knowledge-label">表补充说明</label>
+                    <input
+                      type="text"
+                      className="add-knowledge-input"
+                      placeholder="请输入表补充说明"
+                      value={tableSupplementNotes[table.id] ?? ''}
+                      onChange={(e) => handleTableSupplementNoteChange(table.id, e.target.value)}
+                    />
+                  </div>
+                </div>
                 <div className="column-semantics-modal-search">
                   <input
                     type="text"
@@ -843,16 +899,15 @@ const CreateKnowledgeBase: React.FC = () => {
                     <thead>
                       <tr>
                         <th>列名</th>
-                        <th>列 Comment</th>
-                        <th>全局语义</th>
-                        <th>列语义</th>
+                        <th>列描述</th>
+                        <th>列补充说明</th>
                         <th>启用</th>
                       </tr>
                     </thead>
                     <tbody>
                       {columns.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="empty-state">
+                          <td colSpan={4} className="empty-state">
                             <p className="empty-text">无匹配列</p>
                           </td>
                         </tr>
@@ -878,18 +933,8 @@ const CreateKnowledgeBase: React.FC = () => {
                             <td>
                               <input
                                 type="text"
-                                className="column-semantics-input readonly"
-                                placeholder="在数据中心配置"
-                                value={globalColumnSemantics[table.name]?.[col.name] ?? ''}
-                                readOnly
-                                title="全局语义需在「数据中心」中配置"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
                                 className={`column-semantics-input ${columnSemanticsEnabled[table.id]?.[col.name] === false ? 'disabled' : ''}`}
-                                placeholder="请输入本知识库内该列的语义"
+                                placeholder="请输入列补充说明"
                                 value={columnSemantics[table.id]?.[col.name] ?? ''}
                                 onChange={(e) => handleColumnSemanticChange(table.id, col.name, e.target.value)}
                                 disabled={columnSemanticsEnabled[table.id]?.[col.name] === false}
@@ -900,7 +945,7 @@ const CreateKnowledgeBase: React.FC = () => {
                                 type="button"
                                 role="switch"
                                 aria-checked={columnSemanticsEnabled[table.id]?.[col.name] !== false}
-                                title={columnSemanticsEnabled[table.id]?.[col.name] !== false ? '已启用' : '已禁用，不会被用于检索'}
+                                title={columnSemanticsEnabled[table.id]?.[col.name] !== false ? '已启用' : '禁用后该字段将不会被检索'}
                                 className={`kb-column-semantics-switch ${columnSemanticsEnabled[table.id]?.[col.name] !== false ? 'kb-column-semantics-switch-on' : ''}`}
                                 onClick={() => handleColumnSemanticEnabledToggle(table.id, col.name)}
                               >
@@ -930,7 +975,7 @@ const CreateKnowledgeBase: React.FC = () => {
       {/* 新增知识 / 新增SQL结果集定义 弹窗 */}
       {showAddKnowledgeModal && (
         <div className="add-knowledge-modal-overlay" onClick={closeAddKnowledgeModal}>
-          <div className="add-knowledge-modal" onClick={(e) => e.stopPropagation()}>
+          <div className={`add-knowledge-modal ${addKnowledgeSource === 'logic' ? 'add-knowledge-modal-logic' : ''}`} onClick={(e) => e.stopPropagation()}>
             <div className="add-knowledge-modal-header">
               <h3>
                 {editingId
@@ -964,6 +1009,103 @@ const CreateKnowledgeBase: React.FC = () => {
                       rows={4}
                     />
                   </div>
+                  <div className="add-knowledge-form-group" ref={logicRelatedTablesDropdownRef}>
+                    <label className="add-knowledge-label">选择关联的表</label>
+                    <div className="logic-related-tables-dropdown">
+                      <button
+                        type="button"
+                        className="add-knowledge-select logic-related-tables-trigger"
+                        onClick={() => setLogicRelatedTablesDropdownOpen((v) => !v)}
+                        aria-expanded={logicRelatedTablesDropdownOpen}
+                      >
+                        <span className="logic-related-tables-trigger-text">
+                          {addLogicRelatedTables.length === 0
+                            ? '全部'
+                            : addLogicRelatedTables
+                                .map((id) => selectedTables.find((t) => t.id === id)?.name ?? id)
+                                .join('、')}
+                        </span>
+                        <svg width="12" height="12" viewBox="0 0 12 12" className={`logic-related-tables-chevron ${logicRelatedTablesDropdownOpen ? 'open' : ''}`}>
+                          <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      {logicRelatedTablesDropdownOpen && (
+                        <div className="logic-related-tables-panel">
+                          <div className="logic-related-tables-search">
+                            <input
+                              type="text"
+                              placeholder="搜索表名"
+                              value={logicRelatedTablesSearchKeyword}
+                              onChange={(e) => setLogicRelatedTablesSearchKeyword(e.target.value)}
+                              onMouseDown={(e) => e.stopPropagation()}
+                            />
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+                              <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          </div>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className={`logic-related-tables-option ${addLogicRelatedTables.length === 0 ? 'selected' : ''}`}
+                            onClick={() => setAddLogicRelatedTables([])}
+                            onKeyDown={(e) => e.key === 'Enter' && setAddLogicRelatedTables([])}
+                          >
+                            <span className="logic-related-tables-check-wrap">
+                              {addLogicRelatedTables.length === 0 && (
+                                <svg className="logic-related-tables-check" width="14" height="14" viewBox="0 0 14 14">
+                                  <path d="M2 7l3 3 7-7" stroke="currentColor" strokeWidth="1" strokeLinecap="butt" strokeLinejoin="miter" />
+                                </svg>
+                              )}
+                            </span>
+                            <span>全部</span>
+                          </div>
+                          {(logicRelatedTablesSearchKeyword.trim()
+                            ? selectedTables.filter(
+                                (t) =>
+                                  t.name.toLowerCase().includes(logicRelatedTablesSearchKeyword.trim().toLowerCase()) ||
+                                  (t.description && t.description.toLowerCase().includes(logicRelatedTablesSearchKeyword.trim().toLowerCase()))
+                              )
+                            : selectedTables
+                          ).map((t) => {
+                            const selected = addLogicRelatedTables.includes(t.id);
+                            return (
+                              <div
+                                key={t.id}
+                                role="button"
+                                tabIndex={0}
+                                className={`logic-related-tables-option ${selected ? 'selected' : ''}`}
+                                onClick={() => {
+                                  if (selected) {
+                                    setAddLogicRelatedTables((prev) => prev.filter((id) => id !== t.id));
+                                  } else {
+                                    setAddLogicRelatedTables((prev) => (prev.length === 0 ? [t.id] : [...prev, t.id]));
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key !== 'Enter') return;
+                                  if (selected) {
+                                    setAddLogicRelatedTables((prev) => prev.filter((id) => id !== t.id));
+                                  } else {
+                                    setAddLogicRelatedTables((prev) => (prev.length === 0 ? [t.id] : [...prev, t.id]));
+                                  }
+                                }}
+                              >
+                                <span className="logic-related-tables-check-wrap">
+                                  {selected && (
+                                    <svg className="logic-related-tables-check" width="14" height="14" viewBox="0 0 14 14">
+                                      <path d="M2 7l3 3 7-7" stroke="currentColor" strokeWidth="1" strokeLinecap="butt" strokeLinejoin="miter" />
+                                    </svg>
+                                  )}
+                                </span>
+                                <span>{t.name}{t.description ? ` - ${t.description}` : ''}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div className="add-knowledge-form-group">
                     <label className="add-knowledge-label required">业务逻辑类型</label>
                     <div className="logic-type-options">
@@ -972,11 +1114,11 @@ const CreateKnowledgeBase: React.FC = () => {
                         onClick={() => setAddLogicType('系统智能判断')}
                       >
                         <div className="logic-type-card-header">
+                          <span className="logic-type-title">系统智能判断</span>
+                          <span className="logic-type-tag">推荐</span>
                           <span className="logic-type-radio">
                             {addLogicType === '系统智能判断' && <span className="radio-dot" />}
                           </span>
-                          <span className="logic-type-title">系统智能判断</span>
-                          <span className="logic-type-tag">推荐</span>
                         </div>
                         <p className="logic-type-desc">将由模型根据用户问题内容进行智能判断选择性生效。</p>
                       </label>
@@ -985,10 +1127,10 @@ const CreateKnowledgeBase: React.FC = () => {
                         onClick={() => setAddLogicType('全局类型')}
                       >
                         <div className="logic-type-card-header">
+                          <span className="logic-type-title">全局类型</span>
                           <span className="logic-type-radio">
                             {addLogicType === '全局类型' && <span className="radio-dot" />}
                           </span>
-                          <span className="logic-type-title">全局类型</span>
                         </div>
                         <p className="logic-type-desc">全局型业务逻辑对全部用户问题生效。</p>
                       </label>
